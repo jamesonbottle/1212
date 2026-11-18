@@ -166,15 +166,16 @@ function two different definitions (ODR violation).
 
 ---
 
-## 11. GUI problems  [see GUI_REWRITE.md]
+## 11. GUI problems
 
-The GUI and the Windows platform code were reviewed afterwards. Findings and corrected code are in
-`GUI_REWRITE.md` (wrong "Finished" status after an internal error, hidden memory size and lock state, input
-handling, string widening, DPI, shutdown handling).
+After an internal error the status line says **"Finished"** | medium |
+The GUI never shows the memory size really tested or whether it was locked | medium |
+Manual input is silently clamped, and parsed with `_wtoi`/`_wtoi64` | low |
+Narrow-to-wide string widening is wrong for non-ASCII text | low |
+DPI: system-aware only, blurry on mixed-DPI monitors | low |
+Shutdown/logoff and the second Ctrl-C are not handled defensively | low |
+Small cleanups (fonts, manifest OS list) | trivial |
 
-- [ ] Apply G1 and G2 from `GUI_REWRITE.md`; G2 also implements the GUI half of item 1 above.
-
----
 
 ## Not reviewed (still open)
 
@@ -183,3 +184,12 @@ handling, string widening, DPI, shutdown handling).
 - [ ] The GUI and `platform_win.cpp` were read but never compiled or run (no Windows toolchain in the review
       environment).
 - [ ] Nothing was tested on real DDR5 hardware with many cores.
+
+
+
+
+
+
+
+
+
