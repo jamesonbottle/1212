@@ -202,8 +202,9 @@ struct SuiteDriver {
             R.progress.tStart.store(t0, std::memory_order_release);
             run_tests();
             fpu.stop();
-            print_final_summary(plat::now() - t0);
-            return R.total.lines ? 1 : 0;
+            const bool incomplete = stopped_early();
+            print_final_summary(plat::now() - t0, incomplete);
+            return R.total.lines ? 1 : incomplete ? kExitIncomplete : 0;
         } catch (const std::exception& e) { // the guards above have already run
             R.log.emitf("internal error: %s\n", e.what());
             return 3;
@@ -460,10 +461,24 @@ struct SuiteDriver {
                     (unsigned long long)R.st.unstable.load());
     }
 
-    void print_final_summary(double el) {
-        R.log.emitf("\nfinished in %.0fs: %s (%llu bad lines, %d failing test runs)%s%s\n", el,
-                    R.total.lines ? "ERRORS FOUND" : "no errors", (unsigned long long)R.total.lines.load(), failedTests,
-                    R.progress.stopReason.empty() ? "" : "  - ", R.progress.stopReason.c_str());
+    // A stop that nobody asked for in advance (Ctrl-C, the GUI's Stop, a stop on the first error) ended the run before
+    // it was done. A --coverage target or --minutes limit sets stopReason: that run ended as the user asked.
+    // (A stop that arrives just as the last test ends also counts: the run cannot tell, and "stopped" is the safe word.)
+    bool stopped_early() const {
+        return R.stop.load() && R.progress.stopReason.empty();
+    }
+
+    void print_final_summary(double el, bool incomplete) {
+        const bool errors = R.total.lines.load() != 0;
+        // "no errors" next to a run that was cut short would read as a pass: say it did not finish
+        const char* verdict = errors ? "ERRORS FOUND" : incomplete ? "INCOMPLETE, no errors found so far" : "no errors";
+        std::string why = R.progress.stopReason;
+        if (why.empty() && incomplete)
+            why = errors && cfg.stopOnErr ? "stopped at the first error (--stop-on-error)"
+                                          : "stopped before all tests finished (Ctrl-C or Stop)";
+        R.log.emitf("\n%s %.0fs: %s (%llu bad lines, %d failing test runs)%s%s\n",
+                    incomplete ? "stopped after" : "finished in", el, verdict,
+                    (unsigned long long)R.total.lines.load(), failedTests, why.empty() ? "" : "  - ", why.c_str());
         R.log.emitf("total coverage: %s%% of the %llu pages (4 KiB, virtual addresses) of the %.2f GiB tested region "
                     "verified\n",
                     percent_text(R.cover.pages_covered(), R.cover.pages_total()).c_str(),

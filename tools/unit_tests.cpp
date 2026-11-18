@@ -1508,6 +1508,9 @@ static void test_run_status() {
         worker.join();
         Run::Status f = R.status();
         CHECK(rc == 0, "run_suite on a clean run must return 0, got %d", rc);
+        CHECK(text.find("finished in") != std::string::npos && text.find("no errors") != std::string::npos &&
+                  text.find("INCOMPLETE") == std::string::npos,
+              "a clean run's summary must say finished / no errors, not INCOMPLETE");
         CHECK(f.regionBytes == (8ull << 20) && f.tStart > 0 && f.errors == 0,
               "final status wrong: region %llu start %.2f errors %llu", (unsigned long long)f.regionBytes, f.tStart,
               (unsigned long long)f.errors);
@@ -1518,8 +1521,24 @@ static void test_run_status() {
         Run R(lg);
         R.stop = true; // Stop pressed while the run is still starting up
         int rc = run_suite(st, R);
-        CHECK(rc == 0, "run_suite with stop already set must return 0, got %d", rc);
+        // FIXES.md #3: a run stopped before it finished must not look like a pass
+        CHECK(rc == kExitIncomplete, "run_suite with stop already set must return %d (incomplete), got %d",
+              kExitIncomplete, rc);
         CHECK(text.find("[loop") == std::string::npos, "a Stop requested before the start was lost: a test ran");
+        CHECK(text.find("stopped after") != std::string::npos && text.find("INCOMPLETE") != std::string::npos &&
+                  text.find("finished in") == std::string::npos,
+              "the summary of a stopped run must say stopped / INCOMPLETE, not finished");
+    }
+    { // a stop the user asked for in advance (--minutes) is a finished run: exit 0, the reason in the summary
+        text.clear();
+        Settings tl = st;
+        tl.loops = 0; // until stopped: only the time limit ends it
+        tl.minutes = 0.01;
+        Run R(lg);
+        int rc = run_suite(tl, R);
+        CHECK(rc == 0, "a run ended by its own --minutes limit must return 0, got %d", rc);
+        CHECK(text.find("time limit reached") != std::string::npos && text.find("INCOMPLETE") == std::string::npos,
+              "a run ended by its time limit must name the reason and not say INCOMPLETE");
     }
 }
 

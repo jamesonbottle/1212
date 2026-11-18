@@ -249,20 +249,20 @@ else
 fi
 log="$OUT/inj_pagestop.log"; rm -f "$log"
 DDR5TEST_STOP_IN_FILL=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Page shuffle" --log "$log" > "$OUT/inj_pagestop.out" 2>&1; rc=$?
-check "page shuffle: stopped mid-fill (hard stop): the final verify is skipped, so not even the planted flip is reported, and no false error from pages never filled" '[ $rc -eq 0 ] && [ "$(grep -c "^ERROR" "$log")" = "0" ] || { echo "    rc=$rc ERROR lines: $(grep -c "^ERROR" "$log")"; false; }'
+check "page shuffle: stopped mid-fill (hard stop): the final verify is skipped, so not even the planted flip is reported, and no false error from pages never filled; the run is INCOMPLETE (exit 4)" '[ $rc -eq 4 ] && [ "$(grep -c "^ERROR" "$log")" = "0" ] || { echo "    rc=$rc ERROR lines: $(grep -c "^ERROR" "$log")"; false; }'
 # hard stop in the final verify: a flip planted in the LAST page is found by a verify that runs
 log="$OUT/inj_late.log"; rm -f "$log"
 DDR5TEST_FINAL_LATE_FLIP=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Page shuffle" --log "$log" > "$OUT/inj_late.out" 2>&1; rc=$?
 check "page shuffle: flip in the last page is found when the final verify runs to the end (control)" '[ $rc -eq 1 ] && grep "^ERROR" "$log" | grep -q "pagemix-final.* off=0x3FFF[0-9A-F]* " || { echo "    rc=$rc"; grep "^ERROR" "$log" | cut -c1-140; false; }'
 log="$OUT/inj_latestop.log"; rm -f "$log"
 DDR5TEST_FINAL_LATE_FLIP=1 DDR5TEST_STOP_IN_FINAL=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Page shuffle" --log "$log" > "$OUT/inj_latestop.out" 2>&1; rc=$?
-check "page shuffle: stop raised during the final verify ends it: the late flip is not reported, nothing false is" '[ $rc -le 1 ] && ! grep "^ERROR" "$log" | grep -q " off=0x3FFF[0-9A-F]* " && [ "$(grep "^ERROR" "$log" | grep -vc "pagemix-final.* off=0x3[0-9A-F]\{3\} ")" = "0" ] || { echo "    rc=$rc"; grep "^ERROR" "$log" | cut -c1-140; false; }'
+check "page shuffle: stop raised during the final verify ends it: the late flip is not reported, nothing false is (exit 4, or 1 if some other error was found)" '{ [ $rc -eq 4 ] || [ $rc -eq 1 ]; } && ! grep "^ERROR" "$log" | grep -q " off=0x3FFF[0-9A-F]* " && [ "$(grep "^ERROR" "$log" | grep -vc "pagemix-final.* off=0x3[0-9A-F]\{3\} ")" = "0" ] || { echo "    rc=$rc"; grep "^ERROR" "$log" | cut -c1-140; false; }'
 log="$OUT/inj_evostop.log"; rm -f "$log"
 DDR5TEST_STOP_IN_EVOLVE=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Evolving data" --log "$log" > "$OUT/inj_evostop.out" 2>&1; rc=$?
-check "evolve: stopped mid-rewrite reports no errors (lines the cut-short pass never reached are not verified)" '[ $rc -eq 0 ] && [ "$(grep -c "^ERROR" "$log" 2>/dev/null)" = "0" ] || { echo "    rc=$rc ERROR lines: $(grep -c "^ERROR" "$log" 2>/dev/null)"; grep "run seed" "$OUT/inj_evostop.out"; false; }'
+check "evolve: stopped mid-rewrite reports no errors (lines the cut-short pass never reached are not verified); exit 4, INCOMPLETE" '[ $rc -eq 4 ] && [ "$(grep -c "^ERROR" "$log" 2>/dev/null)" = "0" ] || { echo "    rc=$rc ERROR lines: $(grep -c "^ERROR" "$log" 2>/dev/null)"; grep "run seed" "$OUT/inj_evostop.out"; false; }'
 log="$OUT/inj_copystop.log"; rm -f "$log"
 DDR5TEST_STOP_IN_COPY_FILL=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Bulk copy" --log "$log" > "$OUT/inj_copystop.out" 2>&1; rc=$?
-check "copy: stopped mid-fill ends the fill, skips copy and verify: exit 0, nothing reported (neither the planted faults nor never-written lines)" '[ $rc -eq 0 ] && [ "$(grep -c "^ERROR" "$log")" = "0" ] && grep -q " STOP " "$OUT/inj_copystop.out" || { echo "    rc=$rc ERROR lines: $(grep -c "^ERROR" "$log")"; tail -4 "$OUT/inj_copystop.out"; false; }'
+check "copy: stopped mid-fill ends the fill, skips copy and verify: exit 4 (INCOMPLETE), nothing reported (neither the planted faults nor never-written lines)" '[ $rc -eq 4 ] && [ "$(grep -c "^ERROR" "$log")" = "0" ] && grep -q " STOP " "$OUT/inj_copystop.out" || { echo "    rc=$rc ERROR lines: $(grep -c "^ERROR" "$log")"; tail -4 "$OUT/inj_copystop.out"; false; }'
 log="$OUT/inj_throw.log"; rm -f "$log"
 DDR5TEST_THROW_IN_WORKER=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Solid and checker" --fpu --log "$log" > "$OUT/inj_throw.out" 2>&1; rc=$?
 check "worker exception: exit 3 and 'internal error' logged (no terminate, no hang; --fpu threads joined)" '[ $rc -eq 3 ] && grep -q "internal error: injected worker failure" "$OUT/inj_throw.out" || { echo "    rc=$rc"; tail -5 "$OUT/inj_throw.out"; false; }'
@@ -271,7 +271,7 @@ log="$OUT/inj_sync.log"; rm -f "$log"
 DDR5TEST_EXTRA_SYNC=1 timeout $TMO "$OUT/cli_inject" $RUN -f "Solid and checker" --log "$log" > "$OUT/inj_sync.out" 2>&1; rc=$?
 check "barrier protocol: an extra sync() on one worker is caught (abort with the worker numbers, no hang, no pass)" '[ $rc -ge 128 ] && grep -q "barrier protocol violated in .*: worker 1 made [0-9]* sync() calls, worker 0 made [0-9]*" "$OUT/inj_sync.out" || { echo "    rc=$rc"; tail -4 "$OUT/inj_sync.out"; false; }'
 
-echo "== 4. stop: SIGINT at several moments in every test; the run must end within STOPWAIT seconds, exit 0, report no error"
+echo "== 4. stop: SIGINT at several moments in every test; the run must end within STOPWAIT seconds, exit 4 (0 if it had already finished), report no error"
 # The first Ctrl-C is the stop request (the CLI ends the current step and prints the summary).
 STOPWAIT=${STOPWAIT:-5}
 case "$SAN" in *address*) STOPWAIT=$((STOPWAIT * 3)) ;; esac
@@ -291,7 +291,9 @@ stop_test_ok() {
       sleep 0.1
     done
     wait $p; rc=$?
-    if [ $rc -ne 0 ] || grep -q "^ERROR" "$OUT/stp.log" 2>/dev/null; then
+    # exit 4 and the INCOMPLETE summary go together; a run the stop did not cut short (finished first) is a plain exit 0
+    if { [ $rc -ne 0 ] && [ $rc -ne 4 ]; } || grep -q "^ERROR" "$OUT/stp.log" 2>/dev/null \
+       || { [ $rc -eq 4 ] && ! grep -q "INCOMPLETE" "$OUT/stp.out"; } || { [ $rc -eq 0 ] && grep -q "INCOMPLETE" "$OUT/stp.out"; }; then
       echo "    SIGINT after ${d}s (running: $hit): rc=$rc ERROR lines: $(grep -c "^ERROR" "$OUT/stp.log" 2>/dev/null)"; grep "run seed" "$OUT/stp.out"; tail -3 "$OUT/stp.out"; return 1
     fi
   done
@@ -304,6 +306,21 @@ else
   for TNAME in "${STOPNAMES[@]}"; do
     check "stop: $TNAME" 'stop_test_ok "$TNAME"'
   done
+fi
+
+echo "== 4b. exit code and summary of a stopped run (FIXES.md #3)"
+# 4 = stopped early with no errors found so far; the summary must not read like a pass. A stop the user asked for in
+# advance (--minutes) is a finished run (exit 0). Errors found win (exit 1; stop-on-error is checked in section 3).
+check "usage documents exit code 4" '"$OUT/cli" --help | grep -q "4 = stopped early"'
+if [ "$SAN" = thread ]; then
+  echo "  SKIP  exit code of a stopped run under TSan (too slow for the timing)"
+else
+  rm -f "$OUT/ic.log"
+  "$OUT/cli" -mb 128 -t 2 --no-large-pages --test-seconds 20 -f "Idle gaps" --log "$OUT/ic.log" > "$OUT/ic.out" 2>&1 < /dev/null &
+  p=$!; sleep 2; kill -INT $p 2>/dev/null; wait $p; rc=$?
+  check "Ctrl-C in a running test: exit 4, 'stopped after', INCOMPLETE, and never 'finished in'" '[ $rc -eq 4 ] && grep -q "^stopped after [0-9]*s: INCOMPLETE, no errors found so far" "$OUT/ic.out" && ! grep -q "^finished in" "$OUT/ic.out" || { echo "    rc=$rc"; tail -4 "$OUT/ic.out"; false; }'
+  timeout $TMO "$OUT/cli" -mb 64 -t 2 --no-large-pages --test-seconds 20 -l 0 --minutes 0.03 -f "Idle gaps" --log "$OUT/tl.log" > "$OUT/tl.out" 2>&1; rc=$?
+  check "--minutes limit: the run's own end is a finished run (exit 0, 'finished in', reason 'time limit reached', no INCOMPLETE)" '[ $rc -eq 0 ] && grep -q "^finished in .*no errors.*time limit reached" "$OUT/tl.out" && ! grep -q "INCOMPLETE" "$OUT/tl.out" || { echo "    rc=$rc"; tail -3 "$OUT/tl.out"; false; }'
 fi
 
 echo

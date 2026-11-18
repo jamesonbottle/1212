@@ -46,8 +46,12 @@ stops at 0.0% coverage with "coverage target reached" and exit code 0 (reproduce
 "stopped early".
 
 **Fix.**
-- [ ] Decide the policy: a distinct exit code for an interrupted run, and/or an "INCOMPLETE" label in the summary.
-- [ ] Update `tools/selftest.sh` section 4 and the exit-code text in `usage()` to match.
+- [x] Decide the policy: a distinct exit code for an interrupted run, and/or an "INCOMPLETE" label in the summary.
+      **Decided: both.** Exit 4 and `stopped after Ns: INCOMPLETE, no errors found so far` for a stop nobody asked for
+      in advance (Ctrl-C, GUI Stop). Errors found still give 1. A `--coverage` target or `--minutes` limit that ends
+      the run is deliberate: exit 0, `finished in`, with the reason. Coverage below 100% after every test ran is
+      not "incomplete" (some tests verify no region pages by design); the summary shows the coverage.
+- [x] Update `tools/selftest.sh` section 4 and the exit-code text in `usage()` to match.
 
 **Done when.** The exit code or the summary line tells a finished run from a stopped one.
 

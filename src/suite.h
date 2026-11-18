@@ -60,6 +60,11 @@ struct FpuKernel {
     void run(unsigned outer);
     float sink() const;
 };
+// What run_suite returns (and the CLI exits with): 0 = finished, no errors; 1 = memory errors found; 2 = could not
+// start; 3 = internal error; kExitIncomplete = stopped early (Ctrl-C, the GUI's Stop button) before the run finished,
+// with no errors found up to then. Errors found win over "stopped early" (1, not 4). A stop that the user asked for in
+// advance (--coverage target, --minutes limit) is a finished run: 0.
+inline constexpr int kExitIncomplete = 4;
 // Runs the built-in suite until finished or R.stop.
 int run_suite(const Settings& s, Run& R);
 

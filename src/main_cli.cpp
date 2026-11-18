@@ -43,7 +43,9 @@ static void usage() {
          "once\n"
          "exit code: 0 = no errors, 1 = memory errors found, 2 = could not start (bad option / log file / not enough "
          "memory / memory not lockable), 3 = "
-         "internal error");
+         "internal error,\n"
+         "           4 = stopped early (Ctrl-C) before the run finished, no errors found so far (the summary says "
+         "INCOMPLETE; errors found give 1 even then)");
 }
 
 int main(int argc, char** argv) {

@@ -420,7 +420,7 @@ void on_run_done(int rc, bool closing) {
                                            : L"Errors found (no log file could be written)");
     else if (A.stopRequested)
         setText(A.hTest, L"Stopped");
-    if (rc >= 2) {
+    if (rc == 2 || rc == 3) { // not kExitIncomplete: Stop gives that, and "Stopped" is already shown
         setText(A.hTest, L"Could not run");
         if (closing)
             return; // the user is closing the window: no box in the way
