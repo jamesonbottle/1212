@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <sched.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include <thread>
 #include <vector>
@@ -99,9 +100,40 @@ void lower_priority() {}
 KeepAwake keep_awake(bool) {
     return KeepAwake::NotSupported;
 }
+// Best effort: make RLIMIT_MEMLOCK at least `bytes`, so mlock of the whole region can succeed.
+// A non-root user can raise the soft limit only up to the hard limit; root / CAP_SYS_RESOURCE can raise
+// both. Returns true when the limit is already enough or was raised to `bytes`; on false, `detail` says
+// what the limit is (for the "mlock failed" note).
+static bool raise_memlock_limit(u64 bytes, std::string& detail) {
+    struct rlimit rl;
+    if (getrlimit(RLIMIT_MEMLOCK, &rl) != 0)
+        return true; // cannot tell: let mlock decide
+    if (rl.rlim_cur == RLIM_INFINITY || (u64)rl.rlim_cur >= bytes)
+        return true;
+    const rlim_t want = (rlim_t)bytes;
+    struct rlimit n = rl;
+    n.rlim_cur = want;
+    if (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < want)
+        n.rlim_max = want; // needs CAP_SYS_RESOURCE; fails with EPERM otherwise
+    if (setrlimit(RLIMIT_MEMLOCK, &n) == 0)
+        return true;
+    // Could not raise the hard limit: take what the hard limit allows
+    n = rl;
+    n.rlim_cur = rl.rlim_max;
+    if (rl.rlim_max != rl.rlim_cur && setrlimit(RLIMIT_MEMLOCK, &n) == 0 &&
+        (rl.rlim_max == RLIM_INFINITY || (u64)rl.rlim_max >= bytes))
+        return true;
+    getrlimit(RLIMIT_MEMLOCK, &rl);
+    detail = "RLIMIT_MEMLOCK is " + std::to_string((u64)rl.rlim_cur >> 10) + " KB (hard " +
+             (rl.rlim_max == RLIM_INFINITY ? std::string("unlimited") : std::to_string((u64)rl.rlim_max >> 10) + " KB") +
+             "), needed " + std::to_string(bytes >> 10) + " KB and could not raise it";
+    return false;
+}
 void* alloc(u64 bytes, bool, bool& got, bool& locked, std::string& note, const std::atomic<bool>* stop) {
     got = false;
     locked = false;
+    std::string limitDetail;
+    raise_memlock_limit(bytes, limitDetail);
     void* p = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (p == MAP_FAILED)
         return nullptr;
@@ -117,7 +149,8 @@ void* alloc(u64 bytes, bool, bool& got, bool& locked, std::string& note, const s
     const std::string of =
         lp.done ? " after " + std::to_string(lp.done >> 20) + " of " + std::to_string(bytes >> 20) + " MB" : "";
     if (lp.failed)
-        note = "mlock failed" + of + ": " + strerror(err) + " (see ulimit -l / RLIMIT_MEMLOCK)";
+        note = "mlock failed" + of + ": " + strerror(err) + " (see ulimit -l / RLIMIT_MEMLOCK" +
+               (limitDetail.empty() ? "" : "; " + limitDetail) + ")";
     else if (lp.stopped)
         note = "stopped while locking the memory (" + std::to_string(lp.done >> 20) + " of " +
                std::to_string(bytes >> 20) + " MB locked)";

@@ -14,7 +14,7 @@ whose pages may have been swapped. Reproduced without `CAP_IPC_LOCK` and with a 
 completed, exit code 0. Nothing in the code calls `setrlimit`, so this is the default for a non-root Linux user.
 
 **Fix.**
-- [ ] Before allocating, try to raise `RLIMIT_MEMLOCK` to the size needed (`setrlimit`).
+- [x] Before allocating, try to raise `RLIMIT_MEMLOCK` to the size needed (`setrlimit`).
 - [ ] If memory still cannot be locked, refuse to start (exit 2) unless the user passes an explicit
       `--allow-unlocked`.
 - [ ] Repeat "memory NOT locked" in the final summary and in the log header when it was allowed.
