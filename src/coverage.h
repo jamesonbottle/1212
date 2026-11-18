@@ -89,6 +89,17 @@ inline std::string covered_text(u64 covered, u64 total, double passes) {
     return "covered " + percent_text(covered, total) + "% of " + std::to_string(total) + " pages (" + buf + " passes)";
 }
 
+// The --coverage stop test: have `covered` of `total` pages reached `pct` percent? pct 0 means "no target".
+// Exact for every input and cannot wrap: it divides total by 100 instead of multiplying total by pct (the old
+// covered * 100 >= pct * total wrapped to 0 for a huge pct and stopped the run at 0%). Pages never exceed
+// total, so a target above 100 % can never be reached and gives false.
+inline bool coverage_target_reached(u64 covered, u64 total, u64 pct) {
+    if (!pct || !total || pct > 100)
+        return false;
+    const u64 need = total / 100 * pct + (total % 100 * pct + 99) / 100; // ceil(total * pct / 100)
+    return covered >= need;
+}
+
 // Calls mark(firstPage, pageCount) for every maximal run of pages in [0
 template <class F>
 inline void for_pages_except(std::vector<u64> skip, u64 pages, F&& mark) {

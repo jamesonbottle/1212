@@ -31,9 +31,9 @@ by the page count (`src/run.h:249-250`). `--coverage 281474976710656` on a 256 M
 stops at 0.0% coverage with "coverage target reached" and exit code 0 (reproduced).
 
 **Fix.**
-- [ ] Reject values above 100 in the CLI (the usage text says `PCT`).
-- [ ] Make the comparison in `run.h` overflow-safe (use `__int128`/`mulhi64`, or divide instead of multiply).
-- [ ] Add a unit test for a huge value.
+- [x] Reject values above 100 in the CLI (the usage text says `PCT`).
+- [x] Make the comparison in `run.h` overflow-safe (use `__int128`/`mulhi64`, or divide instead of multiply).
+- [x] Add a unit test for a huge value.
 
 **Done when.** `--coverage 281474976710656` exits 2 with a message, and the stop logic has a test that cannot wrap.
 

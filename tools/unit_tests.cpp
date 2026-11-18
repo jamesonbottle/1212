@@ -2038,6 +2038,38 @@ static void test_pages_except() {
     CHECK(runs({99, 5}, 8) == V({{0, 5}, {6, 2}}), "a page number past the end is ignored");
 }
 
+// The --coverage stop test must be exact and must never wrap (FIXES.md #2).
+static void test_coverage_target() {
+    // The bug: --coverage 281474976710656 on a 256 MB region (65536 pages) wrapped pct * total to 0, so the
+    // old covered * 100 >= pct * total stopped the run at 0 % covered.
+    const u64 huge = 281474976710656ull; // 2^48
+    CHECK(!coverage_target_reached(0, 65536, huge), "a huge target must not be reached at 0 pages");
+    CHECK(!coverage_target_reached(65536, 65536, huge), "a target above 100 %% is never reached, even with every page");
+    CHECK(!coverage_target_reached(~0ull, ~0ull, ~0ull), "the largest inputs must not wrap to 'reached'");
+    CHECK(!coverage_target_reached(65536, 65536, 101), "101 %% is not reachable");
+    // 0 = no target; an empty map has nothing to cover
+    CHECK(!coverage_target_reached(65536, 65536, 0) && !coverage_target_reached(0, 0, 50), "pct 0 / empty map");
+    // 100 % needs every page, and one page short is not enough (also for a region near the top of the range)
+    CHECK(coverage_target_reached(65536, 65536, 100) && !coverage_target_reached(65535, 65536, 100), "100 %% edge");
+    const u64 big = 1ull << 60;
+    CHECK(coverage_target_reached(big, big, 100) && !coverage_target_reached(big - 1, big, 100),
+          "100 %% of a 2^60-page map: no wrap");
+    CHECK(coverage_target_reached(big / 2, big, 50) && !coverage_target_reached(big / 2 - 1, big, 50),
+          "50 %% of a 2^60-page map: no wrap");
+    // rounding: the target is "at least pct percent", so a fraction of a page rounds up (1001 * 50 / 100 = 500.5)
+    CHECK(!coverage_target_reached(500, 1001, 50) && coverage_target_reached(501, 1001, 50), "rounds up");
+    // every small case against the plain definition covered * 100 >= pct * total (no overflow at these sizes)
+    int bad = 0;
+    for (u64 total = 0; total <= 250; total++)
+        for (u64 pct = 0; pct <= 100; pct++)
+            for (u64 covered = 0; covered <= total; covered++) {
+                const bool want = pct && total && covered * 100 >= pct * total;
+                if (coverage_target_reached(covered, total, pct) != want)
+                    bad++;
+            }
+    CHECK(bad == 0, "%d disagreements with covered * 100 >= pct * total on small maps", bad);
+}
+
 // E2b: the algos mark the pages they really verified in Run::cover.
 // The coverage texts of the console / log and the GUI (E2e): one decimal, rounded down, exact wording.
 static void test_coverage_text() {
@@ -2318,6 +2350,7 @@ int main() {
     test_pages_except();
     test_coverage_hooks();
     test_extra_algos();
+    test_coverage_target();
     test_coverage_text();
     test_fpu_kernel();
     test_report();

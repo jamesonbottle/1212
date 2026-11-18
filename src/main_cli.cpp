@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
         else if (a == "--quick")
             s.suite = SuiteSet::Quick;
         else if (a == "--coverage")
-            s.coverageStop = num(BIG >> 8);
+            s.coverageStop = num(100); // PCT: a percentage (the engine stop test also cannot wrap, coverage.h)
         else if (a == "--minutes") {
             std::string v = nx();
             char* e = nullptr;

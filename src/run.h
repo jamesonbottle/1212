@@ -246,8 +246,7 @@ void Run::parallel(F fn) {
             if (!stop.load() && layout.regionBytes) { // user-set stop criteria: coverage target or time limit
                 // coverage = pages of the region that a finished verify has covered (coverage.h), not bytes verified.
                 const u64 pgTotal = cover.pages_total();
-                if (progress.stopCoverage && pgTotal &&
-                    cover.pages_covered() * 100 >= progress.stopCoverage * pgTotal) {
+                if (coverage_target_reached(cover.pages_covered(), pgTotal, progress.stopCoverage)) {
                     progress.stopReason = "coverage target reached";
                     stop = true;
                 } else if (progress.stopSeconds > 0 && progress.tStart > 0 &&

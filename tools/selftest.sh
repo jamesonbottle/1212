@@ -47,7 +47,7 @@ for f in "Address-in-address" "Solid and checker" "Stressapptest-style patterns"
 done
 
 echo "== 2b. option checking and coverage counter"
-for bad in "-mb abc" "-t abc" "-l x" "--minutes abc" "--coverage -5" "--cache bogus" "--flush bogus" "--rng bogus" "-mb" "--seed abc" "--seed -1" "--seed +5" "--seed 0x" "--seed 0xZZ" "--seed 18446744073709551616" "--seed"; do
+for bad in "-mb abc" "-t abc" "-l x" "--minutes abc" "--coverage -5" "--coverage 101" "--coverage 281474976710656" "--cache bogus" "--flush bogus" "--rng bogus" "-mb" "--seed abc" "--seed -1" "--seed +5" "--seed 0x" "--seed 0xZZ" "--seed 18446744073709551616" "--seed"; do
   check "bad option rejected with exit 2: $bad" 'timeout $TMO "$OUT/cli" $bad --list > /dev/null 2>&1; [ $? -eq 2 ]'
 done
 check "valid option values still accepted" 'timeout $TMO "$OUT/cli" -mb 64 -t 2 --cache bypass --flush clflush --rng murmur --minutes 0.5 --coverage 100 --list > /dev/null 2>&1'
