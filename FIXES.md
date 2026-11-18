@@ -15,7 +15,7 @@ completed, exit code 0. Nothing in the code calls `setrlimit`, so this is the de
 
 **Fix.**
 - [x] Before allocating, try to raise `RLIMIT_MEMLOCK` to the size needed (`setrlimit`).
-- [ ] If memory still cannot be locked, refuse to start (exit 2) unless the user passes an explicit
+- [x] If memory still cannot be locked, refuse to start (exit 2) unless the user passes an explicit
       `--allow-unlocked`.
 - [ ] Repeat "memory NOT locked" in the final summary and in the log header when it was allowed.
 

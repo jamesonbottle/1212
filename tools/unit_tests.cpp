@@ -1007,6 +1007,7 @@ static void test_exceptions() {
         st.megabytes = 8;
         st.threads = 2;
         st.largePages = false;
+        st.allowUnlocked = true; // these runs test the engine, not the machine's memlock limit
         st.stressFpu = true;
         st.filter = "Bulk copy";
         st.loops = 1;
@@ -1473,6 +1474,7 @@ static void test_run_status() {
     st.megabytes = 8;
     st.threads = 2;
     st.largePages = false;
+    st.allowUnlocked = true; // these runs test the engine, not the machine's memlock limit
     st.filter = "Bulk copy";
     st.loops = 1; // 0 would mean "until stopped"
     st.testSeconds = 1;
@@ -2142,6 +2144,7 @@ static void test_coverage_hooks() {
         st.megabytes = mb;
         st.threads = 2;
         st.largePages = false;
+        st.allowUnlocked = true; // these runs test the engine, not the machine's memlock limit
         st.filter = filter;
         st.loops = 1;
         st.testSeconds = 1;

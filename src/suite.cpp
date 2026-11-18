@@ -191,6 +191,8 @@ struct SuiteDriver {
             if (!allocate())
                 return 2;
             ScopeExit regionGuard([&] { release_region(); });
+            if (!check_locked())
+                return 2;
             prepare_region();
             FpuThreads fpu;
             ScopeExit fpuGuard([&] { fpu.stop(); });
@@ -343,6 +345,18 @@ struct SuiteDriver {
         }
         stoppedInAlloc = !locked && R.stop.load(std::memory_order_relaxed);
         return R.layout.region != nullptr;
+    }
+    // Memory that is not locked can be paged out: a "no errors" result would then say little about the RAM.
+    // Such a run needs an explicit --allow-unlocked. A stop during the locking is not a locking failure.
+    bool check_locked() const {
+        if (locked || stoppedInAlloc || s.allowUnlocked)
+            return true;
+        R.log.emitf("memory could not be locked into RAM, so the OS may page parts of it out and a clean result "
+                    "would prove little; not starting\n");
+        if (!allocNote.empty())
+            R.log.emitf("note: %s\n", allocNote.c_str());
+        R.log.emitf("fix the limit, lower -mb, or pass --allow-unlocked to run anyway\n");
+        return false;
     }
     void release_region() {
         if (R.layout.region)

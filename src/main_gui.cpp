@@ -287,7 +287,8 @@ void start_run() {
     s.suite = (SuiteSet)std::max(0, (int)SendMessageW(A.hSet, CB_GETCURSEL, 0, 0));
     s.stressFpu = SendMessageW(A.hFpu, BM_GETCHECK, 0, 0) == BST_CHECKED;
     s.largePages = true;
-    s.loops = 0; // runs until stopped
+    s.allowUnlocked = true; // GUI keeps its old behaviour (it has no option for this yet; see FIXES.md #1 and #11)
+    s.loops = 0;            // runs until stopped
 
     {
         std::lock_guard<std::mutex> l(A.logMu);

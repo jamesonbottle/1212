@@ -33,13 +33,16 @@ static void usage() {
          "has it)\n"
          "             [--seed N|0xHEX]   (each run picks a random seed and prints it; pass it back with the same -mb "
          "/ -t to repeat the run)\n"
-         "             [--keep-going | --stop-on-error] [--no-large-pages] [--log FILE] [--list] [--version]\n"
+         "             [--keep-going | --stop-on-error] [--no-large-pages] [--allow-unlocked] [--log FILE] [--list] "
+         "[--version]\n"
+         "             (memory that cannot be locked into RAM may be swapped out: without --allow-unlocked such a run "
+         "is refused, exit 2)\n"
          "             (--log FILE that cannot be opened = exit 2; the default ddr5test.log that cannot be opened only "
          "warns)\n"
          "Ctrl-C stops the run after the current step and prints the summary; a second Ctrl-C ends the process at "
          "once\n"
          "exit code: 0 = no errors, 1 = memory errors found, 2 = could not start (bad option / log file / not enough "
-         "memory), 3 = "
+         "memory / memory not lockable), 3 = "
          "internal error");
 }
 
@@ -160,6 +163,8 @@ int main(int argc, char** argv) {
             s.stopOnError = true;
         else if (a == "--no-large-pages")
             s.largePages = false;
+        else if (a == "--allow-unlocked")
+            s.allowUnlocked = true;
         else if (a == "--log") {
             s.logFile = nx();
             s.logFileSet = true;

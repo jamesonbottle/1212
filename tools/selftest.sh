@@ -24,7 +24,13 @@ echo "== build ($CXX, CMake) -> $OUT"
 cmake -S . -B "$OUT/cmake" -DCMAKE_CXX_COMPILER="$CXX" -DDDR5_OUTPUT_DIR="$OUT" -DDDR5_SANITIZE="$SAN" -DDDR5_CHECK_SYNC=ON > "$OUT/cmake.log" 2>&1 || { cat "$OUT/cmake.log"; exit 2; }
 cmake --build "$OUT/cmake" --target unit_tests ddr5test_cli ddr5test_cli_inject -j "$(nproc 2>/dev/null || echo 2)" > "$OUT/build.log" 2>&1 || { cat "$OUT/build.log"; exit 2; }
 grep -E "error|warning" "$OUT/build.log" && fail=1
-mv -f "$OUT/ddr5test_cli" "$OUT/cli"; mv -f "$OUT/ddr5test_cli_inject" "$OUT/cli_inject"
+mv -f "$OUT/ddr5test_cli" "$OUT/cli_raw"; mv -f "$OUT/ddr5test_cli_inject" "$OUT/cli_inject_raw"
+# A run whose memory cannot be locked is refused unless --allow-unlocked is given (section 2g tests that on cli_raw).
+# The other checks are about the engine, not the memlock limit of the machine, so "cli" / "cli_inject" add the option.
+# exec keeps the pid, so the checks that signal a background run still reach the tester.
+for b in cli cli_inject; do
+  printf '#!/bin/sh\nexec "%s/%s_raw" --allow-unlocked "$@"\n' "$OUT" "$b" > "$OUT/$b"; chmod +x "$OUT/$b"
+done
 
 echo "== 1. unit tests"
 check "orders, windows, generators, built-in suite" 'timeout $TMO "$OUT/unit_tests" > "$OUT/unit.out" 2>&1 || { cat "$OUT/unit.out"; false; }'
@@ -136,6 +142,24 @@ else
   log="$OUT/c3b.log"; rm -f "$log"
   ( ulimit -v 262144; timeout $TMO "$OUT/cli" -mb 2048 -t 2 --no-large-pages --test-seconds 2 -f "Solid and checker" --log "$log" > "$OUT/c3b.out" 2>&1 ); rc=$?
   check "refused at every size (down to 20%): says so, exit 2, no test started" '[ $rc -eq 2 ] && grep -q "^allocation failed at every size from 2048 MB down to [0-9]* MB (9 attempts)" "$OUT/c3b.out" && ! grep -q "\[loop" "$OUT/c3b.out" || { echo "    rc=$rc"; tail -4 "$OUT/c3b.out"; false; }'
+fi
+
+echo "== 2g. memory that cannot be locked: refused (exit 2) unless --allow-unlocked"
+# A 64 KB RLIMIT_MEMLOCK cannot be raised by the tester when it is the hard limit. Root / CAP_IPC_LOCK ignore the limit,
+# so there the situation cannot be made and the checks are skipped.
+ML="-mb 64 -t 2 --no-large-pages --quick --test-seconds 1 -f Bulk\ copy"
+log="$OUT/ml_probe.log"; rm -f "$log"
+if ! ( ulimit -l 64 2>/dev/null && eval "timeout $TMO \"$OUT/cli_raw\" $ML --allow-unlocked --log \"$log\"" > "$OUT/ml_probe.out" 2>&1 ); then
+  echo "  SKIP  unlockable memory (cannot lower RLIMIT_MEMLOCK here, or the probe run failed)"
+elif grep -q "^memory locked" "$OUT/ml_probe.out"; then
+  echo "  SKIP  unlockable memory (this process ignores RLIMIT_MEMLOCK: root or CAP_IPC_LOCK)"
+else
+  log="$OUT/ml_refused.log"; rm -f "$log"
+  ( ulimit -l 64; eval "timeout $TMO \"$OUT/cli_raw\" $ML --log \"$log\"" > "$OUT/ml_refused.out" 2>&1 ); rc=$?
+  check "memory not lockable, no --allow-unlocked: exit 2, says why and how to go on, no test started" '[ $rc -eq 2 ] && grep -q "^memory could not be locked into RAM" "$OUT/ml_refused.out" && grep -q "^note: mlock failed" "$OUT/ml_refused.out" && grep -q -- "--allow-unlocked" "$OUT/ml_refused.out" && ! grep -q "\[loop" "$OUT/ml_refused.out" || { echo "    rc=$rc"; tail -5 "$OUT/ml_refused.out"; false; }'
+  log="$OUT/ml_allowed.log"; rm -f "$log"
+  ( ulimit -l 64; eval "timeout $TMO \"$OUT/cli_raw\" $ML --allow-unlocked --log \"$log\"" > "$OUT/ml_allowed.out" 2>&1 ); rc=$?
+  check "memory not lockable, --allow-unlocked: the run goes on and the header says NOT locked" '[ $rc -eq 0 ] && grep -q "^memory NOT locked" "$OUT/ml_allowed.out" && grep -q "^finished in" "$OUT/ml_allowed.out" || { echo "    rc=$rc"; head -8 "$OUT/ml_allowed.out"; false; }'
 fi
 
 echo "== 3. fault injection: planted faults must be found"

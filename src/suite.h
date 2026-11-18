@@ -31,6 +31,8 @@ struct Settings {
     Rng rngMode = Rng::Default; // hash mixer for 'hash' data; Default = SplitMix
     bool stressFpu = false;
     bool largePages = true;
+    // false = a run whose memory could not be locked (it may be swapped out) is refused with exit 2
+    bool allowUnlocked = false;
     SuiteSet suite = SuiteSet::Full;
     std::string logFile = "ddr5test.log";
     bool logFileSet = false;
