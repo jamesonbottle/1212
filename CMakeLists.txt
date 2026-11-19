@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(ddr5ramtest CXX)
 
 set(DDR5_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/build" CACHE PATH "Where the executables are placed")
-# Sanitizers for every target (GCC / Clang): thread, or address,undefined.
+# Sanitizers for every target (Clang): thread, or address,undefined.
 set(DDR5_SANITIZE "" CACHE STRING "Value for -fsanitize= (thread | address,undefined); empty for none")
 # Debug check of the barrier protocol (every worker must make the same number of Run::sync() calls
 option(DDR5_CHECK_SYNC "Check that all workers make the same number of sync() calls" OFF)

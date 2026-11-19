@@ -43,16 +43,12 @@ jobs:
         run: echo "clang-tidy warnings:" "$(grep -c 'warning:' tidy.log || true)"
 
   linux:
-    name: Linux build + unit tests (${{ matrix.cxx }})
+    name: Linux build + unit tests (clang++)
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        cxx: [g++, clang++]
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build/cmake -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+        run: cmake -S . -B build/cmake -DCMAKE_CXX_COMPILER=clang++
       - name: Build
         run: cmake --build build/cmake --target ddr5test_cli ddr5test_cli_inject unit_tests -j "$(nproc)"
       - name: Unit tests
@@ -74,6 +70,7 @@ jobs:
         run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: Self-test
         env:
+          CXX: clang++
           SAN: ${{ matrix.san }}
         run: bash tools/selftest.sh
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Reproducible self-test of the engine on Linux (needs g++ 11+ and an AVX2 CPU).
+# Reproducible self-test of the engine on Linux (needs clang++ and an AVX2 CPU).
 set -u
 cd "$(dirname "$0")/.."
-CXX=${CXX:-g++}
+CXX=${CXX:-clang++}
 OUT=${OUT:-$(mktemp -d)}
 mkdir -p "$OUT"
 RUN="-mb 64 -t 2 --no-large-pages --test-seconds 3"

@@ -34,7 +34,8 @@ recorded here, treat a clean result as "no errors found by this tool", not as pr
 ## Requirements
 
 - x86-64 CPU with AVX2 (checked at start; the program exits with code 2 and a message if it is missing).
-- Linux: g++ 11+ (or clang++ with C++20), CMake 3.20+, Ninja or Make. Windows: Visual Studio 2022 (MSVC) and CMake.
+- Linux: Clang with C++20 (CI uses `clang++` from Ubuntu 24.04) and CMake 3.20+. Windows: Visual Studio 2022 (MSVC) and CMake.
+  Clang and MSVC are the only supported compilers; GCC is not built or tested.
 
 ## Build
 
@@ -55,7 +56,7 @@ build.bat
 This builds `build\ddr5ramtest.exe` (GUI), `build\ddr5test_cli.exe` and `build\unit_tests.exe`. Set
 `DDR5_WARNINGS_AS_ERRORS=ON` first to build with `/WX`.
 
-CMake options: `DDR5_SANITIZE` (`thread` or `address,undefined`, GCC/Clang), `DDR5_CHECK_SYNC=ON` (check that all
+CMake options: `DDR5_SANITIZE` (`thread` or `address,undefined`, Clang), `DDR5_CHECK_SYNC=ON` (check that all
 workers make the same number of barrier calls), `DDR5_VERSION` (override the version text).
 
 ## Run
@@ -146,7 +147,7 @@ ctest --output-on-failure                                           # from the b
 `tools/selftest.sh` builds the tester and runs the unit tests, a clean run of every test group, option checking,
 seed reproduction, log-file and CPU-restriction behaviour, memory-lock refusal, **fault injection** (the
 `ddr5test_cli_inject` build plants known faults and the self-test checks that each one is found), a coverage audit and
-a stop (SIGINT) check in every test. It needs g++ 11+ and an AVX2 CPU, and takes a while.
+a stop (SIGINT) check in every test. It needs `clang++` (set `CXX` to use another one) and an AVX2 CPU, and takes a while.
 
 The memory-lock checks are skipped when the process ignores `RLIMIT_MEMLOCK` (root or `CAP_IPC_LOCK`).
 
