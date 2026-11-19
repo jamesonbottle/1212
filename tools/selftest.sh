@@ -64,7 +64,9 @@ check "coverage on that 2 MB region is 100.0% of its 512 pages" 'grep -q "total 
 covpct() { sed -n 's/^total coverage: \([0-9.]*\)%.*/\1/p' "$1" | head -1; }
 timeout $TMO "$OUT/cli" -mb 256 -t 2 --no-large-pages -f "Idle gaps" --coverage 100 --log "$OUT/cov100.log" > "$OUT/cov100.out" 2>&1; cov100_rc=$?
 check "--coverage 100 stops only when every page was verified (map at 100.0%, reason given, exit 0)" '[ $cov100_rc -eq 0 ] && [ "$(covpct "$OUT/cov100.out")" = "100.0" ] && grep -q "coverage target reached" "$OUT/cov100.out" || { echo "    rc=$cov100_rc"; grep "coverage\|passes" "$OUT/cov100.out"; false; }'
-timeout $TMO "$OUT/cli" -mb 256 -t 2 --no-large-pages -f "Idle gaps" --coverage 50 --log "$OUT/cov50.log" > "$OUT/cov50.out" 2>&1; cov50_rc=$?
+# 1 GiB, not 256 MB: the stop test runs every 250 ms and coverage grows in whole windows, so on a fast machine a small region
+# was fully covered between two polls (seen on a GitHub runner: 100.0 % instead of about half).
+timeout $TMO "$OUT/cli" -mb 1024 -t 2 --no-large-pages -f "Idle gaps" --coverage 50 --log "$OUT/cov50.log" > "$OUT/cov50.out" 2>&1; cov50_rc=$?
 check "--coverage 50 stops at about half: not before 50% of the pages, not after the whole region (exit 0)" 'p=$(covpct "$OUT/cov50.out"); [ $cov50_rc -eq 0 ] && [ -n "$p" ] && awk -v p="$p" "BEGIN{exit !(p >= 50 && p < 100)}" && grep -q "coverage target reached" "$OUT/cov50.out" || { echo "    rc=$cov50_rc"; grep "coverage\|passes" "$OUT/cov50.out"; false; }'
 
 echo "== 2c. run seed: printed, logged, accepted back, and it reproduces the run"
