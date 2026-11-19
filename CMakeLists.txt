@@ -16,6 +16,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Supported compilers: MSVC on Windows, Clang on Linux (and other non-Windows systems). Nothing else is built or tested.
+if(WIN32)
+  if(NOT MSVC)
+    message(FATAL_ERROR "On Windows ddr5ramtest is built with MSVC (cl.exe); found ${CMAKE_CXX_COMPILER_ID}. Run build.bat from an x64 Native Tools Command Prompt.")
+  endif()
+elseif(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  message(FATAL_ERROR "On Linux ddr5ramtest is built with Clang; found ${CMAKE_CXX_COMPILER_ID}. Configure with -DCMAKE_CXX_COMPILER=clang++.")
+endif()
+
 # Version: generated header in the build directory (see src/build_version.h.in).
 set(DDR5_BUILD_NUMBER 0)
 find_package(Git QUIET)
@@ -148,14 +157,8 @@ if(WIN32)
   add_executable(ddr5ramtest WIN32 src/main_gui.cpp src/app.rc)
   target_link_libraries(ddr5ramtest PRIVATE ddr5engine)
   target_include_directories(ddr5ramtest PRIVATE "${DDR5_GENERATED_DIR}") # app.rc includes build_version.h
-  if(MSVC)
-    target_link_options(ddr5ramtest PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)   # the manifest is embedded by app.rc
-    target_link_libraries(ddr5ramtest PRIVATE comctl32 user32 gdi32 advapi32)
-  else()
-    target_link_options(ddr5ramtest PRIVATE -mwindows -static)
-    target_link_libraries(ddr5ramtest PRIVATE comctl32 gdi32 user32 advapi32)
-    target_link_options(ddr5test_cli PRIVATE -static)
-  endif()
+  target_link_options(ddr5ramtest PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)   # the manifest is embedded by app.rc
+  target_link_libraries(ddr5ramtest PRIVATE comctl32 user32 gdi32 advapi32)
   list(APPEND EXES ddr5ramtest)
 endif()
 
