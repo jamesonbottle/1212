@@ -1191,7 +1191,7 @@ static void test_job_helpers() {
     }
     { // walk_pages: Stop is polled before every page
         Run R(lg);
-        CHECK(kPagesPerTick * (u64)kLinesPerPage == kTickLines, "one page tick is one line tick");
+        static_assert(kPagesPerTick * (u64)kLinesPerPage == kTickLines, "one page tick is one line tick");
         u64 c = 0;
         walk_pages(R, 3 * kPagesPerTick + 5, [&](u64) { c++; });
         CHECK(c == 3 * kPagesPerTick + 5, "walk_pages without a Stop visits everything (%llu)", (unsigned long long)c);
@@ -2227,9 +2227,11 @@ static void test_coverage_hooks() {
     for (const auto& a : algos) {
         // Same exclusion as tools/selftest.sh, on purpose and not a suppression: the read/write storm races by design
         // (the writer rewrites identical data while its partner verifies it), so TSan always reports it.
-        if (kBuiltWithTsan && std::strcmp(a.name, "rwstorm") == 0) {
-            printf("  SKIP  coverage hooks: %s (races by design, see tools/selftest.sh)\n", a.name);
-            continue;
+        if constexpr (kBuiltWithTsan) { // a constant: `if constexpr` keeps MSVC C4127 quiet
+            if (std::strcmp(a.name, "rwstorm") == 0) {
+                printf("  SKIP  coverage hooks: %s (races by design, see tools/selftest.sh)\n", a.name);
+                continue;
+            }
         }
         Out c = go(a.filter, 8, false);
         CHECK(c.rc == 0 && c.total == (8ull << 20) / kPageBytes && c.covered == c.total,
