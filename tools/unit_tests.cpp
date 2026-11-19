@@ -2027,7 +2027,7 @@ static void test_coverage_map() {
         m.reset(n * P);
         std::vector<std::thread> th;
         for (int t = 0; t < 4; t++)
-            th.emplace_back([&m, t, n] {
+            th.emplace_back([&m, t] {
                 for (u64 p = (u64)t; p < n; p += 4) {
                     m.mark(p * P, P);
                     m.mark(p * P, 3 * P); // overlaps the next pages, which other threads set too
