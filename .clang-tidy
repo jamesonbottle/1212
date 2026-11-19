@@ -1,0 +1,14 @@
+# Static analysis: bug, performance and analyzer groups (FIXES.md #4).
+# Two checks are off because they only flag style on this code base:
+#   bugprone-easily-swappable-parameters  (many small helpers take two or three u64 values)
+#   performance-enum-size                 (the enums are small and their size does not matter)
+# Not a build gate by itself: CI runs it and lists the findings (see .github/workflows/ci.yml).
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  clang-analyzer-*,
+  -bugprone-easily-swappable-parameters,
+  -performance-enum-size
+HeaderFilterRegex: '(src|tools)/.*'
+WarningsAsErrors: ''

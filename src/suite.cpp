@@ -463,10 +463,9 @@ struct SuiteDriver {
 
     // A stop that nobody asked for in advance (Ctrl-C, the GUI's Stop, a stop on the first error) ended the run before
     // it was done. A --coverage target or --minutes limit sets stopReason: that run ended as the user asked.
-    // (A stop that arrives just as the last test ends also counts: the run cannot tell, and "stopped" is the safe word.)
-    bool stopped_early() const {
-        return R.stop.load() && R.progress.stopReason.empty();
-    }
+    // (A stop that arrives just as the last test ends also counts: the run cannot tell, and "stopped" is the safe
+    // word.)
+    bool stopped_early() const { return R.stop.load() && R.progress.stopReason.empty(); }
 
     void print_final_summary(double el, bool incomplete) {
         const bool errors = R.total.lines.load() != 0;
@@ -477,8 +476,8 @@ struct SuiteDriver {
             why = errors && cfg.stopOnErr ? "stopped at the first error (--stop-on-error)"
                                           : "stopped before all tests finished (Ctrl-C or Stop)";
         R.log.emitf("\n%s %.0fs: %s (%llu bad lines, %d failing test runs)%s%s\n",
-                    incomplete ? "stopped after" : "finished in", el, verdict,
-                    (unsigned long long)R.total.lines.load(), failedTests, why.empty() ? "" : "  - ", why.c_str());
+                    incomplete ? "stopped after" : "finished in", el, verdict, (unsigned long long)R.total.lines.load(),
+                    failedTests, why.empty() ? "" : "  - ", why.c_str());
         R.log.emitf("total coverage: %s%% of the %llu pages (4 KiB, virtual addresses) of the %.2f GiB tested region "
                     "verified\n",
                     percent_text(R.cover.pages_covered(), R.cover.pages_total()).c_str(),

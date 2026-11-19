@@ -66,12 +66,13 @@ outside this repo; if it does, commit it. Either way, nothing in the repo runs t
 `tools/selftest.sh`.
 
 **Fix.**
-- [ ] README: what the tool tests and does not test, how to build, how to run, exit codes, what "coverage" means
+- [x] README: what the tool tests and does not test, how to build, how to run, exit codes, what "coverage" means
       (virtual 4 KiB pages), the need to lock memory, and why the read/write storm tests race by design.
-- [ ] Commit a `.clang-format` that matches the current style, so `tools/format.sh --check` works.
-- [ ] Add a `.clang-tidy` (start with `bugprone-*`, `performance-*`, `clang-analyzer-*`).
-- [ ] CI that builds, runs `unit_tests`, and runs `tools/selftest.sh` (also with `SAN=address,undefined` and
-      `SAN=thread`).
+- [x] Commit a `.clang-format` that matches the current style, so `tools/format.sh --check` works.
+- [x] Add a `.clang-tidy` (start with `bugprone-*`, `performance-*`, `clang-analyzer-*`).
+- [x] CI that builds, runs `unit_tests`, and runs `tools/selftest.sh` (also with `SAN=address,undefined` and
+      `SAN=thread`). `.github/workflows/ci.yml`; not yet run on GitHub, and its Windows job was never run
+      (no Windows toolchain where it was written). clang-tidy is report-only: it lists findings, it does not fail.
 
 **Done when.** A new clone builds from the README alone, and CI is green on a pull request.
 

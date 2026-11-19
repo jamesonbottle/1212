@@ -124,9 +124,10 @@ static bool raise_memlock_limit(u64 bytes, std::string& detail) {
         (rl.rlim_max == RLIM_INFINITY || (u64)rl.rlim_max >= bytes))
         return true;
     getrlimit(RLIMIT_MEMLOCK, &rl);
-    detail = "RLIMIT_MEMLOCK is " + std::to_string((u64)rl.rlim_cur >> 10) + " KB (hard " +
-             (rl.rlim_max == RLIM_INFINITY ? std::string("unlimited") : std::to_string((u64)rl.rlim_max >> 10) + " KB") +
-             "), needed " + std::to_string(bytes >> 10) + " KB and could not raise it";
+    detail =
+        "RLIMIT_MEMLOCK is " + std::to_string((u64)rl.rlim_cur >> 10) + " KB (hard " +
+        (rl.rlim_max == RLIM_INFINITY ? std::string("unlimited") : std::to_string((u64)rl.rlim_max >> 10) + " KB") +
+        "), needed " + std::to_string(bytes >> 10) + " KB and could not raise it";
     return false;
 }
 void* alloc(u64 bytes, bool, bool& got, bool& locked, std::string& note, const std::atomic<bool>* stop) {
