@@ -41,10 +41,8 @@
 
 using namespace ddr5;
 
-// True when this program is built with ThreadSanitizer (gcc defines __SANITIZE_THREAD__, clang answers __has_feature).
-#if defined(__SANITIZE_THREAD__)
-constexpr bool kBuiltWithTsan = true;
-#elif defined(__has_feature)
+// True when this program is built with ThreadSanitizer (Clang answers __has_feature; MSVC has no TSan).
+#if defined(__has_feature)
 #if __has_feature(thread_sanitizer)
 constexpr bool kBuiltWithTsan = true;
 #else
