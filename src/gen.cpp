@@ -14,10 +14,10 @@ const std::vector<SatPat>& sat_table() {
         auto add = [&](const char* n, std::initializer_list<u32> l, int a, int b, int c, int d) {
             SatPat p{};
             p.name = n;
-            int i = 0;
+            size_t i = 0;
             for (u32 x : l)
                 p.w[i++] = x;
-            p.len = i;
+            p.len = (int)i;
             p.weight[0] = a;
             p.weight[1] = b;
             p.weight[2] = c;
@@ -29,7 +29,7 @@ const std::vector<SatPat>& sat_table() {
         wi.name = "walking-inv-ones";
         w0.name = "walking-zeros";
         w1.len = wi.len = w0.len = 64;
-        for (int i = 0; i < 64; i++) {
+        for (size_t i = 0; i < 64; i++) {
             u32 x = i < 32 ? 1u << i : (i < 63 ? 1u << (62 - i) : 0u); // up 1..0x80000000, then back down to 0
             w1.w[i] = x;
             w0.w[i] = ~x;
@@ -69,7 +69,7 @@ const std::vector<SatPat>& sat_table() {
 static Beats beats_from_lanes(const u16* s) {
     Beats b{};
     for (int L = 0; L < 32; L++)
-        for (int t = 0; t < 16; t++)
+        for (size_t t = 0; t < 16; t++)
             if ((s[L] >> t) & 1)
                 b[t] |= 1u << L;
     return b;
@@ -138,9 +138,9 @@ static void expand_style(const std::string& st, const Params& P, std::vector<std
                 out.push_back({"victim lane " + std::to_string(v) + " " + md.n, beats_from_lanes(s)});
             }
     } else if (st == "walk1" || st == "walk0") {
-        for (int k = 0; k < 32; k++) {
+        for (size_t k = 0; k < 32; k++) {
             Beats b;
-            for (int t = 0; t < 16; t++)
+            for (size_t t = 0; t < 16; t++)
                 b[t] = 1u << ((t + k) % 32);
             if (st == "walk0")
                 for (auto& x : b)
@@ -223,7 +223,7 @@ static std::vector<Var> build_vars_impl(const Params& P, u64 salt, const Logger&
             }
             if (vals.empty())
                 vals.push_back(0);
-            for (int t = 0; t < 16; t++)
+            for (size_t t = 0; t < 16; t++)
                 b[t] = vals[t % vals.size()];
             Var v;
             v.g.set_beats(b);

@@ -86,12 +86,24 @@ outside this repo; if it does, commit it. Either way, nothing in the repo runs t
 real one.
 
 **Fix.**
-- [ ] Add `-Wconversion -Wsign-conversion -Wshadow` to `ddr5_flags` and fix the warnings, starting with
-      `src/lineio.h`, `src/gen.h`, `src/coverage.h`, `src/order.h`, `src/run.h`.
-- [ ] Use `u64` (or `size_t`) loop counters where the value indexes arrays or multiplies by `kLineBytes`.
-- [ ] Keep `/W4` on MSVC and add the matching conversion warnings there.
+- [x] Add `-Wconversion -Wsign-conversion -Wshadow` to `ddr5_flags` and fix the warnings, starting with
+      `src/lineio.h`, `src/gen.h`, `src/coverage.h`, `src/order.h`, `src/run.h`. (`DDR5_WARN_FLAGS` in
+      `CMakeLists.txt`, also used for the `ddr5_cpucheck` libraries. Clang 18 reported 65 distinct warnings, in 16
+      files: 457 sign-conversion and 114 `u64` to `double` lines before de-duplication of the header repeats.
+      No `-Wshadow` and no narrowing hit.)
+- [x] Use `u64` (or `size_t`) loop counters where the value indexes arrays or multiplies by `kLineBytes`.
+      `kLinesPerPage` is now `u64`; `u64` to `double` conversions in printing code are explicit
+      (`gib()` in `src/suite.cpp`).
+- [x] Keep `/W4` on MSVC and add the matching conversion warnings there. `/w44365` adds C4365 (signed/unsigned);
+      C4244/C4267 are already on at `/W4`. Not compiled with MSVC (no Windows toolchain), so the Windows CI job
+      is the first check.
 
 **Done when.** The strict build is warning-free, or each remaining warning has a one-line justification.
+**Result.** Clang 18 strict build: 0 warnings. `unit_tests` and `tools/selftest.sh` pass (the selftest also fails
+on any warning in its own build). One fix was a real, if harmless, sign issue: `sa_flags = SA_RESETHAND` in
+`src/platform_posix.cpp` stored an unsigned sign-bit constant in an `int`; now an explicit cast with a comment.
+The `SAN=address,undefined` and `SAN=thread` selftests were not run (no sanitizer runtime in the review
+environment); their compile step is warning-free.
 
 ---
 

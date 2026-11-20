@@ -91,7 +91,7 @@ struct Run {
     void add_done(u64 bytes) { progress.done.fetch_add(bytes, std::memory_order_relaxed); } // bytes moved, for GB/s
     // Window `ctr` of the thread's chunk.
     View view(int tid, u64 wl, u64 ctr) const {
-        const Chunk& c = layout.chunks[tid];
+        const Chunk& c = layout.chunks[(size_t)tid];
         if (!wl || wl >= c.lines)
             return {c.base, c.g, c.lines};
         u64 nw = (c.lines + wl - 1) / wl, s = (ctr % nw) * wl;
@@ -101,7 +101,7 @@ struct Run {
     }
     // A window of the same size that never overlaps view(tid, wl, ctr): where the disturb traffic goes.
     View dview(int tid, u64 wl, u64 ctr) const {
-        const Chunk& c = layout.chunks[tid];
+        const Chunk& c = layout.chunks[(size_t)tid];
         View v = view(tid, wl, ctr);
         u64 sv = (u64)(v.base - c.base) / kLineBytes, sd = sv + wl;
         if (sd + wl > c.lines)
@@ -112,12 +112,12 @@ struct Run {
         u64 mb = P.num("window_mb", 0);
         if (!mb)
             return 0;
-        u64 wl = (mb << 20) / kLineBytes / layout.T;
+        u64 wl = (mb << 20) / kLineBytes / (u64)layout.T;
         wl = wl / kWindowGranuleLines * kWindowGranuleLines;
         return std::max<u64>(wl, kWindowGranuleLines);
     }
     void sleep_ms(u64 ms) {
-        double end = plat::now() + ms / 1000.0;
+        double end = plat::now() + (double)ms / 1000.0;
         while (plat::now() < end && !stop.load())
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
@@ -257,7 +257,7 @@ void Run::parallel(F fn) {
             }
             if (t - tl >= 0.5) {
                 u64 d = progress.done.load();
-                double rate = (d - dl) / (t - tl) / 1e9;
+                double rate = (double)(d - dl) / (t - tl) / 1e9;
                 tl = t;
                 dl = d;
                 std::string lab;
@@ -350,7 +350,7 @@ inline void walk(Run& R, const Order& o, bool down, F&& f) {
 // walk_n for steps that are one 4 KiB page each (pagemix): Stop is polled BEFORE every step, so it ends the loop
 // at the next page boundary (B1: a Stop must not wait for thousands of pages); progress is reported every
 // kTickLines lines' worth of pages, the same amount per R.tick() as walk_n.
-constexpr u64 kPagesPerTick = kTickLines / (u64)kLinesPerPage;
+constexpr u64 kPagesPerTick = kTickLines / kLinesPerPage;
 static_assert((kPagesPerTick & (kPagesPerTick - 1)) == 0, "walk_pages ticks with a mask");
 template <class F>
 inline void walk_pages(Run& R, u64 n, F&& f) {

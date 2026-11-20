@@ -55,14 +55,22 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# Warning set for Clang. Conversions and shadowing are on so that a value-changing conversion cannot hide
+# among harmless ones; the tree is kept free of these warnings.
+set(DDR5_WARN_FLAGS -Wall -Wextra -Wconversion -Wsign-conversion -Wshadow)
+
 # One place for the compiler flags every target shares (engine, front-ends, tests).
 add_library(ddr5_flags INTERFACE)
 if(DDR5_CHECK_SYNC)
   target_compile_definitions(ddr5_flags INTERFACE DDR5_CHECK_SYNC=1)
 endif()
 if(MSVC)
-  # C4324 (structure padded because of alignas) is the intent of the cache-line aligned counters
-  target_compile_options(ddr5_flags INTERFACE /O2 /arch:AVX2 /EHsc /utf-8 /W4 /wd4324)
+  # C4324 (structure padded because of alignas) is the intent of the cache-line aligned counters.
+  # C4244/C4267 (narrowing and size_t conversions) and C4365 (signed/unsigned) are the MSVC counterparts of
+  # -Wconversion -Wsign-conversion; C4456/C4457/C4458 (shadowing) match -Wshadow. All are on at /W4 except C4365,
+  # which /w44365 adds. /external:anglebrackets /external:W0 keeps it quiet inside <...> (system) headers.
+  target_compile_options(ddr5_flags INTERFACE /O2 /arch:AVX2 /EHsc /utf-8 /W4 /w44365 /wd4324
+                                              /external:anglebrackets /external:W0)
   target_compile_definitions(ddr5_flags INTERFACE _CRT_SECURE_NO_WARNINGS)
   if(DDR5_WARNINGS_AS_ERRORS)
     target_compile_options(ddr5_flags INTERFACE /WX)
@@ -71,14 +79,14 @@ if(MSVC)
 else()
   if(DDR5_SANITIZE)
     # -O1 -g keeps the reports readable and the run fast enough; undefined behaviour must fail the run
-    target_compile_options(ddr5_flags INTERFACE -O1 -g -fno-omit-frame-pointer -fsanitize=${DDR5_SANITIZE} -mavx2 -Wall -Wextra)
+    target_compile_options(ddr5_flags INTERFACE -O1 -g -fno-omit-frame-pointer -fsanitize=${DDR5_SANITIZE} -mavx2 ${DDR5_WARN_FLAGS})
     target_link_options(ddr5_flags INTERFACE -fsanitize=${DDR5_SANITIZE})
     if(DDR5_SANITIZE MATCHES "undefined")
       target_compile_options(ddr5_flags INTERFACE -fno-sanitize-recover=undefined)
       target_link_options(ddr5_flags INTERFACE -fno-sanitize-recover=undefined)
     endif()
   else()
-    target_compile_options(ddr5_flags INTERFACE -O2 -mavx2 -Wall -Wextra)
+    target_compile_options(ddr5_flags INTERFACE -O2 -mavx2 ${DDR5_WARN_FLAGS})
   endif()
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
@@ -124,7 +132,7 @@ foreach(lib ddr5_cpucheck ddr5_cpucheck_inject)
     endif()
     target_compile_definitions(${lib} PRIVATE NDEBUG)
   else()
-    target_compile_options(${lib} PRIVATE -O2 -Wall -Wextra)
+    target_compile_options(${lib} PRIVATE -O2 ${DDR5_WARN_FLAGS})
     if(DDR5_SANITIZE)
       target_compile_options(${lib} PRIVATE -O1 -g -fno-omit-frame-pointer -fsanitize=${DDR5_SANITIZE})
     endif()

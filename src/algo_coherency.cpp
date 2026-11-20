@@ -44,14 +44,14 @@ void algo_coherency(Run& R, const Params& P) {
                 fin = false;
             }
             double end = plat::now() + secs;
-            u32 x = (u32)(splitmix(tid + 1 + R.salt + L * 977) | 1);
+            u32 x = (u32)(splitmix((u64)tid + 1 + R.salt + L * 977) | 1);
             R.sync();
             for (;;) {
                 if (tid < nt) {
                     for (u64 i = 0; i < inc; i++) {
                         x = (x >> 1) ^ ((0u - (x & 1)) & 0xD0000001u);
                         u64 line = x % L;
-                        u64 off = (line & (u64)tid & 1) ? (u64)(nt & ~1) - tid
+                        u64 off = (line & (u64)tid & 1) ? (u64)(nt & ~1) - (u64)tid
                                                         : (u64)tid; // owner byte position differs between lines
                         volatile u8* c = mem + line * kLineBytes + off;
                         *c = (u8)(*c + 1);
@@ -62,7 +62,7 @@ void algo_coherency(Run& R, const Params& P) {
                 if (tid < nt) {
                     u64 sum = 0;
                     for (u64 line = 0; line < L; line++) {
-                        u64 off = (line & (u64)tid & 1) ? (u64)(nt & ~1) - tid : (u64)tid;
+                        u64 off = (line & (u64)tid & 1) ? (u64)(nt & ~1) - (u64)tid : (u64)tid;
                         volatile u8* c = mem + line * kLineBytes + off;
                         sum += *c;
                         *c = 0;

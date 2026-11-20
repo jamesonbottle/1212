@@ -45,7 +45,7 @@ void algo_hammer(Run& R, const Params& P) {
                                 std::max<u64>(1, s / kLineBytes), a});
     const u64 base = R.claim_windows(jobs.size());
     R.parallel([&](int tid) {
-        u64 rng = splitmix(0xABCD + tid * 7919 + R.salt);
+        u64 rng = splitmix(0xABCD + (u64)tid * 7919 + R.salt);
         for_jobs(R, jobs.size(), [&](size_t ji) {
             const Job& j = jobs[ji];
             if (tid == 0)
@@ -82,7 +82,7 @@ void algo_hammer(Run& R, const Params& P) {
                             break;
                     }
                     for (size_t k = 0; k < ag.size(); k++) {
-                        u64 i = (ag[k] - w.base) / kLineBytes;
+                        u64 i = (u64)(ag[k] - w.base) / kLineBytes;
                         Line l;
                         j.g->make(w.g + i, ag[k], false, l);
                         io::store(ag[k], l);

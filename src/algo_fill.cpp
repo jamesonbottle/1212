@@ -98,7 +98,7 @@ void algo_fill(Run& R, const Params& P) {
                 DDR5_INJECT(after_fill, R, tid, ji, w);
                 if (j.dmode >= 0) {
                     disturb_traffic(R, R.dview(tid, wl, base + ji), j.dmode, o.disturb_passes,
-                                    0xD157 + tid + ji + R.salt);
+                                    0xD157 + (u64)tid + ji + R.salt);
                     _mm_sfence();
                     R.sync();
                 }

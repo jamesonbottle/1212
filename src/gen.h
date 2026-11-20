@@ -35,7 +35,7 @@ struct Gen {
     int altshift = -1;
     u64 modn = 0, modoff = 0; // modulo-N: every Nth line (offset) is inverted
     void set_beats(const Beats& b) {
-        for (int j = 0; j < 8; j++) {
+        for (u64 j = 0; j < 8; j++) {
             pat.w[j] = (u64)b[2 * j] | ((u64)b[2 * j + 1] << 32);
             inv.w[j] = ~pat.w[j];
         }
@@ -49,17 +49,17 @@ struct Gen {
                 s ^= (g % modn) == modoff;
             o = s ? inv : pat;
         } else if (kind == 3) {
-            for (int j = 0; j < 8; j++) {
+            for (u64 j = 0; j < 8; j++) {
                 u64 v = (u64)sat_word(*sp, g * 16 + 2 * j, rep) | ((u64)sat_word(*sp, g * 16 + 2 * j + 1, rep) << 32);
                 o.w[j] = invert ? ~v : v;
             }
         } else if (kind == 1) {
-            for (int j = 0; j < 8; j++) {
+            for (u64 j = 0; j < 8; j++) {
                 u64 v = mix64(((g << 3) + j) ^ seed, rng);
                 o.w[j] = invert ? ~v : v;
             }
         } else {
-            for (int j = 0; j < 8; j++) {
+            for (u64 j = 0; j < 8; j++) {
                 u64 v = ((u64)(uintptr_t)addr + 8 * j) ^ seed;
                 o.w[j] = invert ? ~v : v;
             }

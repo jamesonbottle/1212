@@ -82,7 +82,7 @@ inline u64 evo_key(u64 seed, u64 gen) {
     return splitmix(seed ^ (gen * 0xD6E8FEB86659FD93ull));
 }
 inline void evo_make_k(u64 g, u64 k, Rng rng, Line& o) { // rng: Run::rng
-    for (int j = 0; j < 8; j++)
+    for (u64 j = 0; j < 8; j++)
         o.w[j] = mix64(k + (g << 3) + j, rng); // follows the selected RNG (Advanced > RNG / --rng)
 }
 inline void evo_make(u64 g, u64 gen, u64 seed, Rng rng, Line& o) {

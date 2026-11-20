@@ -66,7 +66,7 @@ void audit_report(Run& R) {
     bool anyUn = false;
     for (u64 pg = 0; pg < pages; pg++) {
         bool full = true;
-        for (u64 l = 0; l < (u64)kLinesPerPage && full; l++)
+        for (u64 l = 0; l < kLinesPerPage && full; l++)
             full = g_audit.seen[pg * kLinesPerPage + l].load(std::memory_order_relaxed) != 0;
         bool m = R.cover.marked(pg);
         marked += m;

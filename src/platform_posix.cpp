@@ -32,7 +32,7 @@ void install_ctrlc(std::atomic<bool>* s) {
     std::memset(&sa, 0, sizeof sa);
     sa.sa_handler = ctrl;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESETHAND;
+    sa.sa_flags = (int)SA_RESETHAND; // SA_RESETHAND is the sign bit: an unsigned constant stored in an int field
     sigaction(SIGINT, &sa, nullptr);
 }
 // The CPUs this process may run on (taskset, a cpuset or a container limit shrink it), read once

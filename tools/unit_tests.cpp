@@ -402,13 +402,13 @@ static void test_flush_mode() {
         set_flush_mode(m);
         using io = IO<32, 0, 1>;
         alignas(64) Line mem[4];
-        for (int i = 0; i < 4; i++) {
+        for (u64 i = 0; i < 4; i++) {
             Line e;
-            for (int k = 0; k < 8; k++)
+            for (u64 k = 0; k < 8; k++)
                 e.w[k] = splitmix(i * 8 + k);
             io::store(&mem[i], e);
             Line act;
-            CHECK(io::verify(&mem[i], e, act), "mode %d: flushed store/verify of line %d failed", (int)m, i);
+            CHECK(io::verify(&mem[i], e, act), "mode %d: flushed store/verify of line %d failed", (int)m, (int)i);
             e.w[3] ^= 1;
             CHECK(!io::verify(&mem[i], e, act) && act.w[3] == (e.w[3] ^ 1),
                   "mode %d: a wrong expectation must be reported with the data actually read", (int)m);
@@ -1189,7 +1189,7 @@ static void test_job_helpers() {
     }
     { // walk_pages: Stop is polled before every page
         Run R(lg);
-        static_assert(kPagesPerTick * (u64)kLinesPerPage == kTickLines, "one page tick is one line tick");
+        static_assert(kPagesPerTick * kLinesPerPage == kTickLines, "one page tick is one line tick");
         u64 c = 0;
         walk_pages(R, 3 * kPagesPerTick + 5, [&](u64) { c++; });
         CHECK(c == 3 * kPagesPerTick + 5, "walk_pages without a Stop visits everything (%llu)", (unsigned long long)c);

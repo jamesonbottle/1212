@@ -42,7 +42,7 @@ void disturb_traffic(Run& R, const View& d, int mode, u64 passes, u64 seed) {
             }
             if (mode >= 1) {
                 Line l;
-                for (int k = 0; k < 8; k++)
+                for (u64 k = 0; k < 8; k++)
                     l.w[k] = splitmix(seed + i * 8 + k + p);
                 IO<32, 0, 1>::store(a, l);
             }

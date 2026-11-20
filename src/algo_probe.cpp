@@ -88,7 +88,7 @@ void algo_probe(Run& R, const Params& P) {
             return;
         std::sort(all.begin(), all.end());
         auto pct = [](std::vector<double>& v, double p) {
-            return v[std::min(v.size() - 1, (size_t)(p * v.size()))];
+            return v[std::min(v.size() - 1, (size_t)(p * (double)v.size()))];
         };
         double lo = all[all.size() / 10], hi = pct(all, 0.97), thr = (lo + hi) / 2;
         R.log.print_clear();
@@ -108,7 +108,7 @@ void algo_probe(Run& R, const Params& P) {
             for (double x : v)
                 if (x > thr)
                     slow++;
-            double sp = 100.0 * slow / v.size();
+            double sp = 100.0 * (double)slow / (double)v.size();
             minSlow = std::min(minSlow, sp);
             maxSlow = std::max(maxSlow, sp);
             R.log.emitf("    %-12llu %6.0f %6.0f %6.0f  %5.1f%%\n", (unsigned long long)strides[si], pct(v, 0.5),

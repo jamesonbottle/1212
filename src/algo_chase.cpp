@@ -44,13 +44,13 @@ void algo_chase(Run& R, const Params& P) {
                 R.set_label("chase seed " + std::to_string(sd) + " mlp=" + std::to_string(K));
             View w = R.view(tid, wl, base + ji);
             Order o;
-            u64 seed = splitmix(sd * 31 + tid + R.salt + mi * 977), salt = splitmix(seed ^ 0x5A5A);
+            u64 seed = splitmix(sd * 31 + (u64)tid + R.salt + mi * 977), salt = splitmix(seed ^ 0x5A5A);
             o.init(Order::RANDOM, w.n, 1, seed, R.salt);
             using io = IO<32, 0, 1>;
             auto make = [&](u64 idx, u64 next, Line& l) {
                 l.w[0] = next;
                 l.w[1] = ~next ^ salt;
-                for (int k = 2; k < 8; k++)
+                for (u64 k = 2; k < 8; k++)
                     l.w[k] = splitmix((idx << 3 | k) ^ seed);
             };
             walk_n(R, w.n, [&](u64 i) { // line i of the chain order points at line i + 1 (the last at the first)

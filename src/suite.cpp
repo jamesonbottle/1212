@@ -20,6 +20,11 @@
 
 namespace ddr5 {
 
+// Bytes as GiB for printing; a region never nears 2^53 bytes, so the double is exact.
+static double gib(u64 bytes) {
+    return (double)bytes / 1073741824.0;
+}
+
 static void emit_skew(const char* prefix, const Stats& s, u64 regionBytes, const Logger& log) {
     u64 n = s.lines.load();
     if (n < 16)
@@ -296,7 +301,7 @@ struct SuiteDriver {
             R.log.emitf("not enough memory (need at least 2 MB per thread)\n");
             return false;
         }
-        total = per * R.layout.T;
+        total = per * (u64)R.layout.T;
         return true;
     }
 
@@ -304,10 +309,10 @@ struct SuiteDriver {
         std::string freeTxt = " (free memory unknown)";
         if (avail) {
             freeTxt.clear();
-            appendf(freeTxt, " of %.2f GiB free", avail / 1073741824.0);
+            appendf(freeTxt, " of %.2f GiB free", gib(avail));
         }
         R.log.emitf("ddr5test %s\n", DDR5_VERSION);
-        R.log.emitf("%d threads, testing %.2f GiB%s, %zu tests\n", R.layout.T, total / 1073741824.0, freeTxt.c_str(),
+        R.log.emitf("%d threads, testing %.2f GiB%s, %zu tests\n", R.layout.T, gib(total), freeTxt.c_str(),
                     sel.size());
         R.log.emitf(
             "flush instruction: %s%s\n", flush_mode_name(),
@@ -333,7 +338,7 @@ struct SuiteDriver {
             });
         R.layout.region = (u8*)o.p;
         per = o.per;
-        total = per * R.layout.T;
+        total = per * (u64)R.layout.T;
         if (!R.layout.region) {
             if (o.attempts > 1)
                 R.log.emitf("allocation failed at every size from %llu MB down to %llu MB (%d attempts)\n",
@@ -342,7 +347,7 @@ struct SuiteDriver {
                 R.log.emitf("allocation of %llu MB failed\n", (unsigned long long)(total >> 20));
         } else if (o.attempts > 1) {
             R.log.emitf("testing %.2f GiB instead of the %.2f GiB planned (%d allocation attempts)\n",
-                        total / 1073741824.0, planned / 1073741824.0, o.attempts);
+                        gib(total), gib(planned), o.attempts);
         }
         stoppedInAlloc = !locked && R.stop.load(std::memory_order_relaxed);
         return R.layout.region != nullptr;
@@ -387,10 +392,10 @@ struct SuiteDriver {
         R.parallel([&](int tid) {
             const u64 slice = 64ull << 20;
             for (u64 off = 0; off < per && !R.stop.load(std::memory_order_relaxed); off += slice)
-                std::memset(R.layout.chunks[tid].base + off, 0, std::min(slice, per - off));
+                std::memset(R.layout.chunks[(size_t)tid].base + off, 0, std::min(slice, per - off));
         });
         std::string hdr;
-        appendf(hdr, "---- ddr5test run, %.2f GiB, %d threads, seed 0x%016llX, version %s ----\n", total / 1073741824.0,
+        appendf(hdr, "---- ddr5test run, %.2f GiB, %d threads, seed 0x%016llX, version %s ----\n", gib(total),
                 R.layout.T, (unsigned long long)runSeed, DDR5_VERSION);
         R.write_error_log(hdr);
     }
@@ -431,7 +436,7 @@ struct SuiteDriver {
         u64 bad = R.st.lines.load();
         // coverage is the whole run's so far (4 KiB virtual pages, every line compared); passes are this test's
         R.log.emitf("    %s  %.1fs  %.1f GB/s avg   %s\n", bad ? "FAIL" : (R.stop ? "STOP" : "pass"), el,
-                    R.progress.done.load() / 1e9 / std::max(el, 1e-9),
+                    (double)R.progress.done.load() / 1e9 / std::max(el, 1e-9),
                     covered_text(R.cover.pages_covered(), R.cover.pages_total(),
                                  (double)R.progress.vbytes.load() / (double)total)
                         .c_str());
@@ -481,7 +486,7 @@ struct SuiteDriver {
         R.log.emitf("total coverage: %s%% of the %llu pages (4 KiB, virtual addresses) of the %.2f GiB tested region "
                     "verified\n",
                     percent_text(R.cover.pages_covered(), R.cover.pages_total()).c_str(),
-                    (unsigned long long)R.cover.pages_total(), total / 1073741824.0);
+                    (unsigned long long)R.cover.pages_total(), gib(total));
         DDR5_INJECT(audit_report, R); // E2f: fault-injection builds only
         R.log.emitf("total verified passes: %.1fx\n", (double)R.progress.vtotal.load() / (double)total);
         if (R.errors.logFailed)

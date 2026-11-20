@@ -199,7 +199,7 @@ void algo_march(Run& R, const Params& P) {
                     if (e.dist) {
                         if (distOk)
                             disturb_traffic(R, R.dview(tid, wl, base + ji), e.dmode, e.dpasses,
-                                            0xD157 + tid * 31 + ji * 7 + ei + R.salt);
+                                            0xD157 + (u64)tid * 31 + ji * 7 + ei + R.salt);
                         _mm_sfence();
                         R.sync();
                         continue;

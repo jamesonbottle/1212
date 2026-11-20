@@ -18,7 +18,7 @@ using u64 = uint64_t;
 
 constexpr u64 kLineBytes = 64;                                // one DDR5 burst = one cache line = one tested "line"
 constexpr u64 kPageBytes = 4096;                              // the page the pagemix test shuffles and copies
-constexpr int kLinesPerPage = (int)(kPageBytes / kLineBytes); // 64
+constexpr u64 kLinesPerPage = kPageBytes / kLineBytes;        // 64
 constexpr u64 kTickLines = 0x10000;                           // lines a thread verifies between two progress updates
 
 struct alignas(kLineBytes) Line {

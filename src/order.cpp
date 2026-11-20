@@ -44,7 +44,7 @@ void Order::init(K kk, u64 nn, u64 stride, u64 seed, u64 salt) {
         if (bits & 1)
             bits++;
         h = bits / 2;
-        for (int i = 0; i < 4; i++)
+        for (u64 i = 0; i < 4; i++)
             fk[i] = splitmix(seed + salt * 7919 + 0x1234 * (i + 1));
         break;
     case BITREV:

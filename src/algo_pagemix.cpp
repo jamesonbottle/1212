@@ -23,7 +23,7 @@ struct PagePat {
 template <int FL>
 static void pm_fill(u8* p, const Gen& g, bool inv) {
     using io = IO<32, 0, FL>;
-    for (int l = 0; l < kLinesPerPage; l++) {
+    for (u64 l = 0; l < kLinesPerPage; l++) {
         Line e;
         g.make(l, p + l * kLineBytes, inv, e);
         io::store(p + l * kLineBytes, e);
@@ -32,7 +32,7 @@ static void pm_fill(u8* p, const Gen& g, bool inv) {
 template <int FL>
 static void pm_check(Run& R, int tid, u8* p, const Gen& g, bool inv, const char* ph) {
     using io = IO<32, 0, FL>;
-    for (int l = 0; l < kLinesPerPage; l++) {
+    for (u64 l = 0; l < kLinesPerPage; l++) {
         Line e, a;
         g.make(l, p + l * kLineBytes, inv, e);
         R.vtick();
@@ -46,7 +46,7 @@ static void pm_check(Run& R, int tid, u8* p, const Gen& g, bool inv, const char*
 template <int FL>
 static void pm_copy(Run& R, int tid, u8* s, u8* d, const Gen& g, bool inv) {
     using io = IO<32, 0, FL>;
-    for (int l = 0; l < kLinesPerPage; l++) {
+    for (u64 l = 0; l < kLinesPerPage; l++) {
         Line e, a;
         g.make(l, s + l * kLineBytes, inv, e);
         R.vtick();
@@ -63,7 +63,7 @@ static void pm_invert(u8* p) {
     static const int dir[4] = {0, 1, 1, 0}; // up, down, down, up
     const __m256i ones = _mm256_set1_epi32(-1);
     for (int pass = 0; pass < 4; pass++)
-        for (int k = 0; k < kLinesPerPage; k++) {
+        for (u64 k = 0; k < kLinesPerPage; k++) {
             u8* a = p + (dir[pass] ? kLinesPerPage - 1 - k : k) * kLineBytes;
             CBAR();
             __m256i x = _mm256_xor_si256(_mm256_load_si256((const __m256i*)a), ones),
@@ -101,7 +101,7 @@ void algo_pagemix(Run& R, const Params& P) {
     u64 wsum = 0;
     for (auto& t : tab)
         for (int w = 0; w < 4; w++)
-            wsum += t.weight[w];
+            wsum += (u64)t.weight[w];
     auto pick = [&](u64 r) {
         PagePat q{};
         u64 x = r % (wsum * 2);
@@ -114,7 +114,7 @@ void algo_pagemix(Run& R, const Params& P) {
                     q.rep = (u8)w;
                     return q;
                 }
-                x -= tab[i].weight[w];
+                x -= (u64)tab[i].weight[w];
             }
         return q;
     };
@@ -126,7 +126,7 @@ void algo_pagemix(Run& R, const Params& P) {
         return g;
     };
     R.parallel([&](int tid) {
-        u64 rng = splitmix(0x5A7 + tid * 7919 + R.salt);
+        u64 rng = splitmix(0x5A7 + (u64)tid * 7919 + R.salt);
         auto nx = [&] {
             rng = splitmix(rng);
             return rng;
