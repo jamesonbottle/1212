@@ -116,11 +116,38 @@ barrier sync between them. Inside one march element with several ops on the same
 comes from DRAM and not from cache.
 
 **Fix.**
-- [ ] Measure it: time the read after the flush on real hardware, with and without an `MFENCE`.
-- [ ] If the read can hit the cache, add `_mm_mfence()` between the flush and the next access to the same line in
-      the cache-bypass path, or document the limit.
+- [x] Measure it: time the read after the flush on real hardware, with and without an `MFENCE`.
+      `tools/flush_order_bench.cpp` (`cmake --build <dir> --target flush_order_bench`, not in the default build)
+      times a dependent chain of `store; flush; [fence]; load` on a 256 MB region against a cache-hit and a DRAM
+      reference. Run on an Intel Xeon @ 2.30 GHz (a cloud VM, 2 vCPUs, DRAM generation unknown; two runs, ns per
+      step, best of 5):
+
+      | sequence                          | CLFLUSH | CLFLUSHOPT |
+      |-----------------------------------|---------|------------|
+      | HIT: store; load, 4 KiB set       | 14      | 14         |
+      | DRAM: plain load, big set         | 183-200 | 143-185    |
+      | store; flush; load (as `IO::store`) | 246-248 | **34-39** |
+      | store; flush; sfence; load        | 245-248 | 248-304    |
+      | store; flush; mfence; load        | 561-633 | 637-657    |
+      | store; load, no flush, big set    | 34      | 37         |
+      | store NT; load (with or without sfence) | 567-653 | 660-766 |
+
+      **Result.** With CLFLUSHOPT (what `--flush auto` picks on any CPU that has it) the unfenced read after
+      the flush costs the same as a cache hit: it is answered from the cache or the store buffer, not from DRAM.
+      With CLFLUSH, and with an `sfence`/`mfence` after CLFLUSHOPT, the read costs a DRAM access. Non-temporal
+      stores are not affected.
+- [x] If the read can hit the cache, add `_mm_mfence()` between the flush and the next access to the same line in
+      the cache-bypass path, or document the limit. `src/algo_march.cpp` now issues `_mm_mfence()` before every op
+      group that reads lines an earlier op of the same element touched, when flush is on (once per burst group, so
+      per line only at `burst=1`). The other algorithms separate write and verify of a line with `sfence` and a
+      barrier sync, and the read/write storm tests read another thread's chunk, so they need no fence;
+      `src/lineio.h` now says so in a comment.
 
 **Done when.** There is a measurement or a written statement of what the same-line reads guarantee.
+**Guarantee now.** With flush on, a march read that follows an op on the same lines reads DRAM. Not covered: other
+CPUs and real DDR5 hardware (the measurement is from one VM; rerun the benchmark on the target machine), and
+whether `sfence` alone would be enough (it measured as DRAM here, but only `mfence` is architecturally guaranteed
+to order a load after CLFLUSHOPT).
 
 ---
 

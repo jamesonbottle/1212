@@ -7,6 +7,10 @@
 
 namespace ddr5 {
 
+// Ordering: store() and verify() with FL = 1 end in CLFLUSH/CLFLUSHOPT and then only a compiler barrier. A later load of
+// the same line is not guaranteed to miss the cache (measured with CLFLUSHOPT: it is answered from the cache/store
+// buffer). Callers that read a line they just touched and need DRAM to answer put an _mm_mfence() in between (march
+// does); the write-all / sfence / sync / verify-all phases of the other algorithms do not need one.
 // line I/O at selectable width / cache behaviour W = access width in bytes (8 scalar, 16 SSE2
 template <int W, int NT, int FL>
 struct IO {

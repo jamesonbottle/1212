@@ -225,9 +225,19 @@ void algo_march(Run& R, const Params& P) {
                     u64 cnt = 0;
                     for (u64 q0 = 0; q0 < w.n && !R.stop; q0 += j.burst) {
                         u64 qe = std::min(q0 + j.burst, w.n);
-                        for (const MOp& op : e.ops)
+                        const MOp* prev = nullptr;
+                        for (const MOp& op : e.ops) {
+                            // A read after another op on the same lines must see DRAM, not the cache: CLFLUSHOPT is
+                            // not ordered with a later load, so without a fence the load can be answered from the
+                            // cache or the store buffer (measured: tools/flush_order_bench.cpp, FIXES.md #6).
+                            // Once per op group, so per line only at burst=1.
+                            if constexpr (decltype(FLc)::value != 0)
+                                if (prev && op.t == 'r')
+                                    _mm_mfence();
                             for (u64 q = q0; q < qe; q++)
                                 apply(op, o.pos(q, down));
+                            prev = &op;
+                        }
                         cnt += qe - q0;
                         if (cnt >= kTickLines) {
                             R.tick();

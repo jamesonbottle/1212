@@ -160,6 +160,10 @@ target_link_libraries(unit_tests PRIVATE ddr5engine)
 
 set(EXES ddr5test_cli ddr5test_cli_inject unit_tests)
 
+# Hardware measurement for FIXES.md #6 (not part of the default build): cmake --build <dir> --target flush_order_bench
+add_executable(flush_order_bench EXCLUDE_FROM_ALL tools/flush_order_bench.cpp)
+target_link_libraries(flush_order_bench PRIVATE ddr5engine)
+
 if(WIN32)
   enable_language(RC)
   add_executable(ddr5ramtest WIN32 src/main_gui.cpp src/app.rc)
