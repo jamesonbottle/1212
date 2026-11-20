@@ -190,10 +190,14 @@ any character as the data digit (`op[1] - '0'`). Only the built-in suite feeds i
 only counters grow, which is deliberate, but the user cannot raise it for a full capture.
 
 **Fix.**
-- [ ] Add `--max-log N` (0 = unlimited) to the CLI and `usage()`.
-- [ ] Say in the console and log when the cap was reached.
+- [x] Add `--max-log N` (0 = unlimited) to the CLI and `usage()`. (`Settings::maxLog`, default 200, copied into
+      `Cfg::maxLog`; also in the README option table.)
+- [x] Say in the console and log when the cap was reached. (`Run::report` writes `NOTE: error log limit reached
+      (N errors logged); further errors are only counted...` right after the last logged block, so once per run.)
 
 **Done when.** The option works and the cap message appears once per run.
+**Result.** Unit tests (cap 200, custom cap, 0 = unlimited, cap above the error count) and two new fault-injection
+selftest checks (`--max-log 10` and `0` on the 42 planted lines). The GUI keeps the default of 200 (no option there).
 
 ---
 

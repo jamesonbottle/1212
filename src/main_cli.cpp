@@ -35,6 +35,8 @@ static void usage() {
          "/ -t to repeat the run)\n"
          "             [--keep-going | --stop-on-error] [--no-large-pages] [--allow-unlocked] [--log FILE] [--list] "
          "[--version]\n"
+         "             [--max-log N]   (error blocks written to the console and log; default 200, 0 = unlimited; the "
+         "rest are only counted)\n"
          "             (memory that cannot be locked into RAM may be swapped out: without --allow-unlocked such a run "
          "is refused, exit 2)\n"
          "             (--log FILE that cannot be opened = exit 2; the default ddr5test.log that cannot be opened only "
@@ -115,6 +117,8 @@ int main(int argc, char** argv) {
             s.suite = SuiteSet::Quick;
         else if (a == "--coverage")
             s.coverageStop = num(100); // PCT: a percentage (the engine stop test also cannot wrap, coverage.h)
+        else if (a == "--max-log")
+            s.maxLog = num(BIG); // 0 = unlimited
         else if (a == "--minutes") {
             std::string v = nx();
             char* e = nullptr;

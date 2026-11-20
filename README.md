@@ -73,6 +73,7 @@ the same number of barrier calls), `DDR5_VERSION` (override the version text).
 | `--allow-unlocked` | Continue when the memory cannot be locked. |
 | `--no-large-pages` | Do not ask for large pages. |
 | `--log FILE` | Log file (default `ddr5test.log`). |
+| `--max-log N` | Error blocks written to the console and log (default 200, `0` = unlimited). Later errors are only counted; a note says so once. |
 
 `ddr5test_cli --help` lists every option.
 

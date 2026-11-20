@@ -37,6 +37,7 @@ struct Settings {
     std::string logFile = "ddr5test.log";
     bool logFileSet = false;
     u64 coverageStop = 0;
+    u64 maxLog = 200; // error blocks written to the console/log before only counting continues (0 = unlimited)
     double minutes = 0;
     u64 loops = 0;
     std::string filter;

@@ -83,6 +83,8 @@ struct Run {
 #endif
         bar->arrive_and_wait();
     }
+    // How many error blocks report() writes (0 = unlimited); run_suite sets it from --max-log, tests call it directly.
+    void set_max_log(u64 n) { cfg.maxLog = n; }
     void set_label(const std::string& s) {
         std::lock_guard<std::mutex> l(errors.mu);
         label = s;

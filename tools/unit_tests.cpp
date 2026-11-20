@@ -1604,15 +1604,15 @@ static void test_report() {
         }
         CHECK(R.error_count() == 1, "error_count %llu", (unsigned long long)R.error_count());
     }
-    // 4 threads report 100 errors each
-    {
-        const u64 maxLog = Cfg().maxLog;
+    // 4 threads report 100 errors each; `cap` = Cfg::maxLog (0 = unlimited). Returns the blocks written.
+    auto storm = [&](u64 cap, u64& counted) {
         std::vector<std::string> blocks;
         Logger lg;
         lg.sink = [&](const std::string& t) {
             blocks.push_back(t);
         };
         Run R(lg);
+        R.set_max_log(cap);
         R.layout.region = mem;
         R.set_label("report storm");
         R.layout.T = 4;
@@ -1620,14 +1620,64 @@ static void test_report() {
             for (int i = 0; i < 100; i++)
                 R.report(tid, mem + 64 * (size_t)((tid + i) % 8), e, a, "verify", false);
         });
-        CHECK(R.error_count() == 400, "every error must be counted, got %llu", (unsigned long long)R.error_count());
-        CHECK(blocks.size() == maxLog, "exactly maxLog (%llu) blocks must be written, got %zu",
+        counted = R.error_count();
+        return blocks;
+    };
+    auto isError = [](const std::string& b) {
+        return b.rfind("ERROR t=", 0) == 0 && std::count(b.begin(), b.end(), '\n') == 9;
+    };
+    auto isCapNote = [](const std::string& b) {
+        return b.rfind("NOTE: error log limit reached", 0) == 0;
+    };
+    // default cap: exactly maxLog error blocks, then the cap note once, and every error still counted
+    {
+        const u64 maxLog = Cfg().maxLog;
+        u64 counted = 0;
+        const std::vector<std::string> blocks = storm(maxLog, counted);
+        CHECK(counted == 400, "every error must be counted, got %llu", (unsigned long long)counted);
+        CHECK(blocks.size() == maxLog + 1, "maxLog (%llu) blocks and one cap note must be written, got %zu",
               (unsigned long long)maxLog, blocks.size());
-        for (const std::string& b : blocks)
-            if (b.rfind("ERROR t=", 0) != 0 || std::count(b.begin(), b.end(), '\n') != 9) {
-                CHECK(false, "a block is malformed or interleaved: '%.120s'", b.c_str());
+        for (size_t i = 0; i + 1 < blocks.size(); i++)
+            if (!isError(blocks[i])) {
+                CHECK(false, "a block is malformed or interleaved: '%.120s'", blocks[i].c_str());
                 break;
             }
+        CHECK(!blocks.empty() && isCapNote(blocks.back()) && blocks.back().find("200 errors logged") != std::string::npos &&
+                  blocks.back().find("--max-log") != std::string::npos,
+              "the last block must be the cap note: '%.160s'", blocks.empty() ? "" : blocks.back().c_str());
+    }
+    // a custom cap
+    {
+        u64 counted = 0;
+        const std::vector<std::string> blocks = storm(7, counted);
+        size_t errs = 0, notes = 0;
+        for (const std::string& b : blocks) {
+            errs += isError(b) ? 1 : 0;
+            notes += isCapNote(b) ? 1 : 0;
+        }
+        CHECK(counted == 400 && errs == 7 && notes == 1, "cap 7: counted %llu, %zu error blocks, %zu notes",
+              (unsigned long long)counted, errs, notes);
+    }
+    // 0 = unlimited: all 400 are written and there is no cap note
+    {
+        u64 counted = 0;
+        const std::vector<std::string> blocks = storm(0, counted);
+        size_t notes = 0;
+        for (const std::string& b : blocks)
+            notes += isCapNote(b) ? 1 : 0;
+        CHECK(counted == 400 && blocks.size() == 400 && notes == 0,
+              "unlimited: counted %llu, %zu blocks, %zu notes (want 400, 400, 0)", (unsigned long long)counted,
+              blocks.size(), notes);
+    }
+    // a cap larger than the number of errors never prints the note
+    {
+        u64 counted = 0;
+        const std::vector<std::string> blocks = storm(401, counted);
+        size_t notes = 0;
+        for (const std::string& b : blocks)
+            notes += isCapNote(b) ? 1 : 0;
+        CHECK(blocks.size() == 400 && notes == 0, "cap above the error count: %zu blocks, %zu notes", blocks.size(),
+              notes);
     }
 }
 

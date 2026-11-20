@@ -247,6 +247,7 @@ struct SuiteDriver {
         cfg.stopOnErr = s.stopOnError;
         cfg.logFile = s.logFile;
         cfg.loops = s.loops;
+        cfg.maxLog = s.maxLog;
         R.rng = s.rngMode;
         set_flush_mode(s.flushMode);
         runSeed = s.seedSet ? s.seed : fresh_seed();

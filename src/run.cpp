@@ -76,14 +76,19 @@ void Run::report(int tid, const u8* addr, const Line& e, const Line& a, const ch
     if (cfg.stopOnErr)
         stop = true;
     // Everything above is counting and always happens.
-    if (errors.logged.load(std::memory_order_relaxed) >= cfg.maxLog)
+    const u64 cap = cfg.maxLog; // 0 = unlimited
+    if (cap && errors.logged.load(std::memory_order_relaxed) >= cap)
         return;
     std::lock_guard<std::mutex> l(errors.mu);
-    if (errors.logged.load(std::memory_order_relaxed) >= cfg.maxLog)
+    if (cap && errors.logged.load(std::memory_order_relaxed) >= cap)
         return; // another thread took the last slot while this one waited
-    errors.logged.fetch_add(1, std::memory_order_relaxed);
+    const u64 n = errors.logged.fetch_add(1, std::memory_order_relaxed) + 1;
     // 2. format and 3. write (`label` is read under the lock, set_label() takes it too)
     publish_error(format_error_block(tnow - progress.tStart, label, phase, tid, (const void*)addr, off, d, rr, e, a));
+    if (cap && n == cap) // the thread that takes the last slot says so, once per run, to the console and the log
+        publish_error("NOTE: error log limit reached (" + std::to_string(cap) +
+                      " errors logged); further errors are only counted. Raise the limit with --max-log N (0 = "
+                      "unlimited)\n");
 }
 
 void Run::write_error_log(const std::string& text) {

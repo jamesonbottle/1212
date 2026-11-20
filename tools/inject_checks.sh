@@ -13,6 +13,13 @@ inject_checks_portable() {
   # The statistics that Run::report feeds for every bad line (G3 moved this code; nothing else pins it): the planted
   # faults are fixed, so the lanes, beats, codeword classes and re-read classes are exact.
   check "fill: DQ lane, beat, x8-codeword and re-read statistics of the planted faults" 'grep -q "DQ lane errors  : \[0\]=41 \[2\]=1 \[7\]=1 \[12\]=1 " "$OUT/inj_fill.out" && grep -q "BL16 beat errors: \[1\]=1 \[2\]=40 \[5\]=1 " "$OUT/inj_fill.out" && grep -q "bit-count 1/2/3-4/5+: 42/1/0/0 *re-read: transient=0 stable=42 unstable=0" "$OUT/inj_fill.out" || { grep -E "DQ lane|BL16 beat|bit-count" "$OUT/inj_fill.out"; false; }'
+  # --max-log: the cap, the once-only note (console and log), and 0 = unlimited (FIXES.md #9)
+  log="$OUT/inj_maxlog.log"; rm -f "$log"
+  timeout $TMO "$INJ" $RUN -f "Solid and checker" --max-log 10 --log "$log" > "$OUT/inj_maxlog.out" 2>&1; rc=$?
+  check "--max-log 10: exit 1, 10 error blocks logged, all 42 still counted, the limit note once on console and in the log" '[ $rc -eq 1 ] && [ "$(grep -c "^ERROR" "$log")" = "10" ] && grep -q "42 bad lines, 44 bits" "$OUT/inj_maxlog.out" && [ "$(grep -c "^NOTE: error log limit reached" "$OUT/inj_maxlog.out")" = "1" ] && [ "$(grep -c "^NOTE: error log limit reached" "$log")" = "1" ]'
+  log="$OUT/inj_maxlog0.log"; rm -f "$log"
+  timeout $TMO "$INJ" $RUN -f "Solid and checker" --max-log 0 --log "$log" > "$OUT/inj_maxlog0.out" 2>&1; rc=$?
+  check "--max-log 0: unlimited, all 42 logged and no limit note" '[ $rc -eq 1 ] && [ "$(grep -c "^ERROR" "$log")" = "42" ] && ! grep -q "error log limit reached" "$OUT/inj_maxlog0.out" "$log"'
   log="$OUT/inj_page.log"; rm -f "$log"
   timeout $TMO "$INJ" $RUN -f "Page shuffle" --log "$log" > "$OUT/inj_page.out" 2>&1; rc=$?
   check "page shuffle: exit 1, flip caught in final verify" '[ $rc -eq 1 ] && grep -q "pagemix-final" "$log"'

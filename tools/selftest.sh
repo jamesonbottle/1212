@@ -47,10 +47,10 @@ for f in "Address-in-address" "Solid and checker" "Stressapptest-style patterns"
 done
 
 echo "== 2b. option checking and coverage counter"
-for bad in "-mb abc" "-t abc" "-l x" "--minutes abc" "--coverage -5" "--coverage 101" "--coverage 281474976710656" "--cache bogus" "--flush bogus" "--rng bogus" "-mb" "--seed abc" "--seed -1" "--seed +5" "--seed 0x" "--seed 0xZZ" "--seed 18446744073709551616" "--seed"; do
+for bad in "-mb abc" "-t abc" "-l x" "--minutes abc" "--coverage -5" "--coverage 101" "--coverage 281474976710656" "--max-log abc" "--max-log -1" "--max-log" "--cache bogus" "--flush bogus" "--rng bogus" "-mb" "--seed abc" "--seed -1" "--seed +5" "--seed 0x" "--seed 0xZZ" "--seed 18446744073709551616" "--seed"; do
   check "bad option rejected with exit 2: $bad" 'timeout $TMO "$OUT/cli" $bad --list > /dev/null 2>&1; [ $? -eq 2 ]'
 done
-check "valid option values still accepted" 'timeout $TMO "$OUT/cli" -mb 64 -t 2 --cache bypass --flush clflush --rng murmur --minutes 0.5 --coverage 100 --list > /dev/null 2>&1'
+check "valid option values still accepted" 'timeout $TMO "$OUT/cli" -mb 64 -t 2 --cache bypass --flush clflush --rng murmur --minutes 0.5 --coverage 100 --max-log 0 --list > /dev/null 2>&1'
 check "--version prints the version and exits 0" 'v=$(timeout $TMO "$OUT/cli" --version) && [ "${v#ddr5test_cli }" != "$v" ] && [ "${#v}" -gt 14 ]'
 check "the version is on the console and in the log header of a run (same text as --version)" 'v=$(timeout $TMO "$OUT/cli" --version); v=${v#ddr5test_cli }; timeout $TMO "$OUT/cli" $RUN -f "Bulk copy" --log "$OUT/ver.log" > "$OUT/ver.out" 2>&1; head -3 "$OUT/ver.out" | grep -qxF "ddr5test $v" && grep -qF ", version $v ----" "$OUT/ver.log" || { head -3 "$OUT/ver.out"; head -2 "$OUT/ver.log"; false; }'
 check "seed accepted as decimal, hex, 0 and the 64-bit maximum" 'for sv in 12345 0xDEADBEEF 0 18446744073709551615 0xFFFFFFFFFFFFFFFF; do timeout $TMO "$OUT/cli" --seed $sv --list > /dev/null 2>&1 || exit 1; done'

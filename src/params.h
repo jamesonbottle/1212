@@ -74,7 +74,8 @@ struct TestDef {
     std::string algo() const { return lower(p.str("algo", "fill")); }
 };
 struct Cfg {
-    u64 loops = 1, maxLog = 200;
+    u64 loops = 1;
+    u64 maxLog = 200; // error blocks logged; 0 = unlimited
     int threads = 0;
     bool large = true, stopOnErr = false;
     std::string logFile = "ddr5test.log";
