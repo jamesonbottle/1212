@@ -920,6 +920,11 @@ static void test_values() {
         {"fill", "width", "12", "key 'width': '12' is not a bus width"},
         {"march", "march", "^(w0) >(r0)", "bad march element '>(r0)' (direction must be ^ or u, v or *)"},
         {"fill", "altshift", "6 64", "key 'altshift': 64 is not a bit of the line index"},
+        {"march", "march", "^(w0) u(r0,w2)", "bad march op 'w2' in element 'u(r0,w2)'"},
+        {"march", "march", "^(w0) u(r0,x1)", "bad march op 'x1' in element 'u(r0,x1)'"},
+        {"march", "march", "^(w0) u(r0,w10)", "bad march op 'w10' in element 'u(r0,w10)'"},
+        {"march", "march", "^(w0) u(r0,r)", "bad march op 'r' in element 'u(r0,r)'"},
+        {"march", "march", "^(w0) u", "bad march element 'u'"},
     };
     for (auto& c : cases) {
         std::vector<std::string> r = bad_values(mk(c.algo, c.key, c.val));

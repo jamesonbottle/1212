@@ -19,8 +19,10 @@ namespace ddr5 {
 static std::vector<MEl> parse_march(const std::string& s, const Logger& log, const std::string& where) {
     std::vector<MEl> out;
     for (auto& tok : split_ws(s)) {
-        if (tok.size() < 3)
+        if (tok.size() < 3) {
+            log.emitf("%sbad march element '%s'\n", where.c_str(), tok.c_str());
             continue;
+        }
         MEl e{};
         e.dir = tok[0];
         size_t a = tok.find('('), b = tok.rfind(')');
@@ -62,9 +64,13 @@ static std::vector<MEl> parse_march(const std::string& s, const Logger& log, con
             out.push_back(e);
             continue;
         }
-        for (auto& op : split_ws(body, true))
-            if (op.size() == 2 && (op[0] == 'r' || op[0] == 'w'))
+        for (auto& op : split_ws(body, true)) {
+            if (op.size() == 2 && (op[0] == 'r' || op[0] == 'w') && (op[1] == '0' || op[1] == '1'))
                 e.ops.push_back({op[0], op[1] - '0'});
+            else
+                log.emitf("%sbad march op '%s' in element '%s' (use r0, r1, w0 or w1)\n", where.c_str(), op.c_str(),
+                          tok.c_str());
+        }
         out.push_back(e);
     }
     return out;

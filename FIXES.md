@@ -173,11 +173,14 @@ any character as the data digit (`op[1] - '0'`). Only the built-in suite feeds i
 `src/suite_data.cpp` would change a test with no message.
 
 **Fix.**
-- [ ] Log every dropped or malformed op the way bad elements are logged.
-- [ ] Accept only `0` and `1` as the digit.
-- [ ] Unit test: malformed op strings give a message.
+- [x] Log every dropped or malformed op the way bad elements are logged. (`bad march op 'w2' in element
+      'u(r0,w2)' (use r0, r1, w0 or w1)`; a token shorter than 3 characters is now reported as a bad element too.)
+- [x] Accept only `0` and `1` as the digit.
+- [x] Unit test: malformed op strings give a message. (`w2`, `x1`, `w10`, `r`, and a bare `u` in
+      `tools/unit_tests.cpp`.)
 
 **Done when.** `bad_values()` reports a malformed march op.
+**Result.** Done; `unit_tests` pass and the strict build has 0 warnings. The built-in suite is still clean.
 
 ---
 
