@@ -24,7 +24,8 @@ console program (`ddr5test_cli`, Linux and Windows) and a Windows GUI (`ddr5ramt
 ## Requirements
 
 - x86-64 CPU with AVX2.
-- Linux: Clang (C++20) and CMake 3.20+. Windows: Visual Studio 2022 (MSVC) and CMake.
+- Clang (C++20) and CMake 3.20+ on both systems. Windows: `clang-cl` and `lld-link` from LLVM, plus the Windows SDK and
+  C++ runtime headers/libraries that Visual Studio 2022 (or its Build Tools) installs. The MSVC compiler (`cl.exe`) is not used.
 
 ## Build
 
@@ -37,7 +38,7 @@ cmake --build build/cmake --target ddr5test_cli unit_tests -j
 
 Executables go to `build/` (change with `-DDDR5_OUTPUT_DIR=...`).
 
-Windows (from an "x64 Native Tools Command Prompt for VS"):
+Windows (from an "x64 Native Tools Command Prompt for VS", which sets `INCLUDE` and `LIB`; LLVM must be on `PATH`):
 
 ```bat
 build.bat
@@ -137,7 +138,7 @@ bash tools/format.sh --check   # fail if any file is not formatted
 clang-tidy -p build/cmake src/*.cpp   # config: .clang-tidy
 ```
 
-CI (`.github/workflows/ci.yml`) runs the format check, clang-tidy, the Linux (Clang) and Windows (MSVC) builds with
+CI (`.github/workflows/ci.yml`) runs the format check, clang-tidy, the Linux and Windows (clang-cl) builds, both with Clang, with
 unit tests, and the self-test on every push and pull request.
 
 ## Extra algorithms

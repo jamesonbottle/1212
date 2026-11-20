@@ -2,7 +2,9 @@
 // types.h - tiny base included by everything: fixed-width names, the 64-byte Line, bit helpers
 #include <cstdint>
 #include <immintrin.h>
-#if defined(_MSC_VER)
+// MSVC's own cl.exe gets the MSVC intrinsics. clang-cl also defines _MSC_VER but is Clang: it takes the GNU/builtin
+// paths (the same ones the Linux build uses), which also avoid intrinsics that need a target feature flag (clflushopt).
+#if defined(_MSC_VER) && !defined(__clang__)
 #include <intrin.h>
 #define CBAR() _ReadWriteBarrier()
 #else
@@ -16,10 +18,10 @@ using u16 = uint16_t;
 using u32 = uint32_t;
 using u64 = uint64_t;
 
-constexpr u64 kLineBytes = 64;                                // one DDR5 burst = one cache line = one tested "line"
-constexpr u64 kPageBytes = 4096;                              // the page the pagemix test shuffles and copies
-constexpr u64 kLinesPerPage = kPageBytes / kLineBytes;        // 64
-constexpr u64 kTickLines = 0x10000;                           // lines a thread verifies between two progress updates
+constexpr u64 kLineBytes = 64;                         // one DDR5 burst = one cache line = one tested "line"
+constexpr u64 kPageBytes = 4096;                       // the page the pagemix test shuffles and copies
+constexpr u64 kLinesPerPage = kPageBytes / kLineBytes; // 64
+constexpr u64 kTickLines = 0x10000;                    // lines a thread verifies between two progress updates
 
 struct alignas(kLineBytes) Line {
     u64 w[8];
@@ -33,14 +35,14 @@ inline u64 splitmix(u64 x) {
     return x ^ (x >> 31);
 }
 inline int pc32(u32 v) {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
     return (int)__popcnt(v);
 #else
     return __builtin_popcount(v);
 #endif
 }
 inline int clz64(u64 v) {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
     unsigned long i;
     _BitScanReverse64(&i, v);
     return 63 - (int)i;

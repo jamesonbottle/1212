@@ -1,6 +1,6 @@
 // flush.cpp - run-time choice between CLFLUSH and CLFLUSHOPT (see flush.h).
 #include "flush.h"
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 #include <intrin.h>
 #else
 #include <cpuid.h>
@@ -11,7 +11,7 @@ namespace ddr5 {
 bool g_flush_opt = false;
 
 bool cpu_has_clflushopt() {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
     int r[4] = {0, 0, 0, 0};
     __cpuid(r, 0);
     if (r[0] < 7)

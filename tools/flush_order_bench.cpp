@@ -124,16 +124,25 @@ int main(int argc, char** argv) {
             continue;
         set_flush_mode(m);
         const char* nm = flush_mode_name();
-        auto row = [&](const char* what, double ns) { std::printf("%-10s %-34s %10.1f\n", nm, what, ns); };
-        row("HIT   store; load (4 KiB set)", best_of(5, [&] { return run_chain<0, 0, Fence::None>(mem, smallLines, steps, sink); }));
+        auto row = [&](const char* what, double ns) {
+            std::printf("%-10s %-34s %10.1f\n", nm, what, ns);
+        };
+        row("HIT   store; load (4 KiB set)",
+            best_of(5, [&] { return run_chain<0, 0, Fence::None>(mem, smallLines, steps, sink); }));
         row("DRAM  load only (big set)", best_of(5, [&] { return run_load_only(mem, bigLines, steps, sink); }));
         row("MISS  load; flush; mfence; load", best_of(5, [&] { return run_load_miss(mem, bigLines, steps, sink); }));
-        row("store; flush; mfence; load", best_of(5, [&] { return run_chain<0, 1, Fence::Mfence>(mem, bigLines, steps, sink); }));
-        row("store; flush; sfence; load", best_of(5, [&] { return run_chain<0, 1, Fence::Sfence>(mem, bigLines, steps, sink); }));
-        row("store; flush; load  (as IO::store)", best_of(5, [&] { return run_chain<0, 1, Fence::None>(mem, bigLines, steps, sink); }));
-        row("store; load  (no flush, big set)", best_of(5, [&] { return run_chain<0, 0, Fence::None>(mem, bigLines, steps, sink); }));
-        row("store NT; load  (no fence)", best_of(5, [&] { return run_chain<1, 0, Fence::None>(mem, bigLines, steps, sink); }));
-        row("store NT; sfence; load", best_of(5, [&] { return run_chain<1, 0, Fence::Sfence>(mem, bigLines, steps, sink); }));
+        row("store; flush; mfence; load",
+            best_of(5, [&] { return run_chain<0, 1, Fence::Mfence>(mem, bigLines, steps, sink); }));
+        row("store; flush; sfence; load",
+            best_of(5, [&] { return run_chain<0, 1, Fence::Sfence>(mem, bigLines, steps, sink); }));
+        row("store; flush; load  (as IO::store)",
+            best_of(5, [&] { return run_chain<0, 1, Fence::None>(mem, bigLines, steps, sink); }));
+        row("store; load  (no flush, big set)",
+            best_of(5, [&] { return run_chain<0, 0, Fence::None>(mem, bigLines, steps, sink); }));
+        row("store NT; load  (no fence)",
+            best_of(5, [&] { return run_chain<1, 0, Fence::None>(mem, bigLines, steps, sink); }));
+        row("store NT; sfence; load",
+            best_of(5, [&] { return run_chain<1, 0, Fence::Sfence>(mem, bigLines, steps, sink); }));
     }
     std::printf("(sink %llx)\n", (unsigned long long)sink);
     std::free(mem);

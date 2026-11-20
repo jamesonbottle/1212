@@ -74,7 +74,7 @@ void algo_copy(Run& R, const Params& P) {
                 if (j.m == "memcpy")
                     std::memcpy(d, s, nb);
                 else if (j.m == "movsb") {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
                     __movsb(d, s, nb);
 #else
                     asm volatile("rep movsb" : "+D"(d), "+S"(s), "+c"(nb) : : "memory");

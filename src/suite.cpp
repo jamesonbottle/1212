@@ -313,8 +313,7 @@ struct SuiteDriver {
             appendf(freeTxt, " of %.2f GiB free", gib(avail));
         }
         R.log.emitf("ddr5test %s\n", DDR5_VERSION);
-        R.log.emitf("%d threads, testing %.2f GiB%s, %zu tests\n", R.layout.T, gib(total), freeTxt.c_str(),
-                    sel.size());
+        R.log.emitf("%d threads, testing %.2f GiB%s, %zu tests\n", R.layout.T, gib(total), freeTxt.c_str(), sel.size());
         R.log.emitf(
             "flush instruction: %s%s\n", flush_mode_name(),
             s.flushMode == FlushMode::ClFlushOpt && !flush_uses_opt() ? " (CLFLUSHOPT not supported by this CPU)" : "");
@@ -347,8 +346,8 @@ struct SuiteDriver {
             else
                 R.log.emitf("allocation of %llu MB failed\n", (unsigned long long)(total >> 20));
         } else if (o.attempts > 1) {
-            R.log.emitf("testing %.2f GiB instead of the %.2f GiB planned (%d allocation attempts)\n",
-                        gib(total), gib(planned), o.attempts);
+            R.log.emitf("testing %.2f GiB instead of the %.2f GiB planned (%d allocation attempts)\n", gib(total),
+                        gib(planned), o.attempts);
         }
         stoppedInAlloc = !locked && R.stop.load(std::memory_order_relaxed);
         return R.layout.region != nullptr;

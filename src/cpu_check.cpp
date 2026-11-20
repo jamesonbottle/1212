@@ -1,7 +1,7 @@
 // cpu_check.cpp - run-time AVX2 check (see cpu_check.h).
 #include "cpu_check.h"
 #include <cstdlib>
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 #include <immintrin.h>
 #include <intrin.h>
 #else
@@ -23,7 +23,7 @@ Avx2Status avx2_status() {
     unsigned l1ecx = 0, l7ebx = 0;
     unsigned long long xcr0 = 0;
     bool leaf7Ok = false;
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
     int r[4] = {0, 0, 0, 0};
     __cpuid(r, 0);
     const int maxLeaf = r[0];

@@ -1642,7 +1642,8 @@ static void test_report() {
                 CHECK(false, "a block is malformed or interleaved: '%.120s'", blocks[i].c_str());
                 break;
             }
-        CHECK(!blocks.empty() && isCapNote(blocks.back()) && blocks.back().find("200 errors logged") != std::string::npos &&
+        CHECK(!blocks.empty() && isCapNote(blocks.back()) &&
+                  blocks.back().find("200 errors logged") != std::string::npos &&
                   blocks.back().find("--max-log") != std::string::npos,
               "the last block must be the cap note: '%.160s'", blocks.empty() ? "" : blocks.back().c_str());
     }
