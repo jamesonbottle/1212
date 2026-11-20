@@ -67,7 +67,7 @@ std::vector<MVar> parse_march_variants(const std::string& str, const Logger& log
 
 // algo: evolve (data that changes from pass to pass)
 inline u64 mulhi64(u64 a, u64 b) {
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
     return __umulh(a, b);
 #else
     return (u64)(((unsigned __int128)a * b) >> 64);

@@ -7,8 +7,8 @@ set(DDR5_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/build" CACHE PATH "Where the executable
 set(DDR5_SANITIZE "" CACHE STRING "Value for -fsanitize= (thread | address,undefined); empty for none")
 # Debug check of the barrier protocol (every worker must make the same number of Run::sync() calls
 option(DDR5_CHECK_SYNC "Check that all workers make the same number of sync() calls" OFF)
-# Windows (clang-cl) only: treat warnings as errors (off by default)
-option(DDR5_WARNINGS_AS_ERRORS "Build with /WX on Windows (clang-cl)" OFF)
+# MSVC only: treat warnings as errors (off by default
+option(DDR5_WARNINGS_AS_ERRORS "Build with /WX on MSVC" OFF)
 # Version text shown in the run header, `ddr5test_cli --version` and the exe's version resource.
 set(DDR5_VERSION "" CACHE STRING "Version string (default: git describe --tags --always --dirty, or 'unknown')")
 
@@ -16,11 +16,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Supported compilers: Clang everywhere. On Windows that is clang-cl (Clang with the MSVC command line; CMake treats it as
-# MSVC, so the `if(MSVC)` branches below are the clang-cl ones), linked with lld-link. Nothing else is built or tested.
+# Supported compilers: MSVC on Windows, Clang on Linux (and other non-Windows systems). Nothing else is built or tested.
 if(WIN32)
-  if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
-    message(FATAL_ERROR "On Windows ddr5ramtest is built with clang-cl; found ${CMAKE_CXX_COMPILER_ID} (${CMAKE_CXX_COMPILER_FRONTEND_VARIANT} command line). Run build.bat from an x64 Native Tools Command Prompt, or configure with -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_LINKER=lld-link.")
+  if(NOT MSVC)
+    message(FATAL_ERROR "On Windows ddr5ramtest is built with MSVC (cl.exe); found ${CMAKE_CXX_COMPILER_ID}. Run build.bat from an x64 Native Tools Command Prompt.")
   endif()
 elseif(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   message(FATAL_ERROR "On Linux ddr5ramtest is built with Clang; found ${CMAKE_CXX_COMPILER_ID}. Configure with -DCMAKE_CXX_COMPILER=clang++.")
@@ -66,10 +65,12 @@ if(DDR5_CHECK_SYNC)
   target_compile_definitions(ddr5_flags INTERFACE DDR5_CHECK_SYNC=1)
 endif()
 if(MSVC)
-  # clang-cl: MSVC-style switches for optimisation, code generation and /WX, Clang-style warning flags (the same set as
-  # on Linux). Headers found through the INCLUDE environment variable (Windows SDK, MSVC STL) are system headers
-  # for clang-cl, so their warnings stay quiet.
-  target_compile_options(ddr5_flags INTERFACE /O2 /arch:AVX2 /EHsc /utf-8 ${DDR5_WARN_FLAGS})
+  # C4324 (structure padded because of alignas) is the intent of the cache-line aligned counters.
+  # C4244/C4267 (narrowing and size_t conversions) and C4365 (signed/unsigned) are the MSVC counterparts of
+  # -Wconversion -Wsign-conversion; C4456/C4457/C4458 (shadowing) match -Wshadow. All are on at /W4 except C4365,
+  # which /w44365 adds. /external:anglebrackets /external:W0 keeps it quiet inside <...> (system) headers.
+  target_compile_options(ddr5_flags INTERFACE /O2 /arch:AVX2 /EHsc /utf-8 /W4 /w44365 /wd4324
+                                              /external:anglebrackets /external:W0)
   target_compile_definitions(ddr5_flags INTERFACE _CRT_SECURE_NO_WARNINGS)
   if(DDR5_WARNINGS_AS_ERRORS)
     target_compile_options(ddr5_flags INTERFACE /WX)
@@ -124,7 +125,7 @@ foreach(lib ddr5_cpucheck ddr5_cpucheck_inject)
   add_library(${lib} STATIC src/cpu_check.cpp)
   target_include_directories(${lib} PUBLIC src)
   if(MSVC)
-    target_compile_options(${lib} PRIVATE /O2 /EHsc /utf-8 ${DDR5_WARN_FLAGS}) # no /arch:AVX2: this code runs before the AVX2 check
+    target_compile_options(${lib} PRIVATE /O2 /EHsc /utf-8 /W4 /wd4324)
     target_compile_definitions(${lib} PRIVATE _CRT_SECURE_NO_WARNINGS)
     if(DDR5_WARNINGS_AS_ERRORS)
       target_compile_options(${lib} PRIVATE /WX)

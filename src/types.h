@@ -2,9 +2,7 @@
 // types.h - tiny base included by everything: fixed-width names, the 64-byte Line, bit helpers
 #include <cstdint>
 #include <immintrin.h>
-// MSVC's own cl.exe gets the MSVC intrinsics. clang-cl also defines _MSC_VER but is Clang: it takes the GNU/builtin
-// paths (the same ones the Linux build uses), which also avoid intrinsics that need a target feature flag (clflushopt).
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 #include <intrin.h>
 #define CBAR() _ReadWriteBarrier()
 #else
@@ -35,14 +33,14 @@ inline u64 splitmix(u64 x) {
     return x ^ (x >> 31);
 }
 inline int pc32(u32 v) {
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
     return (int)__popcnt(v);
 #else
     return __builtin_popcount(v);
 #endif
 }
 inline int clz64(u64 v) {
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
     unsigned long i;
     _BitScanReverse64(&i, v);
     return 63 - (int)i;

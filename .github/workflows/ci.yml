@@ -79,14 +79,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      # Only sets INCLUDE / LIB / PATH for the Windows SDK and the C++ runtime; the compiler is LLVM's clang-cl, the linker lld-link.
       - uses: ilammy/msvc-dev-cmd@v1
-      - name: Toolchain versions
-        shell: cmd
-        run: |
-          clang-cl --version
-          lld-link --version
-      - name: Build (GUI, CLI, unit tests with clang-cl; warnings are errors)
+      - name: Build (GUI, CLI, unit tests; warnings are errors)
         shell: cmd
         env:
           DDR5_WARNINGS_AS_ERRORS: 'ON'

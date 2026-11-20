@@ -19,7 +19,7 @@ extern bool g_flush_opt;
 
 inline void flush_line(const void* p) {
     if (g_flush_opt) {
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
         _mm_clflushopt((void*)p);
 #else
         // inline asm so no -mclflushopt is needed (the build only enables AVX2)

@@ -73,7 +73,6 @@ outside this repo; if it does, commit it. Either way, nothing in the repo runs t
 - [x] CI that builds, runs `unit_tests`, and runs `tools/selftest.sh` (also with `SAN=address,undefined` and
       `SAN=thread`). `.github/workflows/ci.yml`; not yet run on GitHub, and its Windows job was never run
       (no Windows toolchain where it was written). clang-tidy is report-only: it lists findings, it does not fail.
-      **Update:** the Windows job now builds with clang-cl + lld-link (LLVM), not cl.exe; see section 5.
 
 **Done when.** A new clone builds from the README alone, and CI is green on a pull request.
 
@@ -95,12 +94,9 @@ real one.
 - [x] Use `u64` (or `size_t`) loop counters where the value indexes arrays or multiplies by `kLineBytes`.
       `kLinesPerPage` is now `u64`; `u64` to `double` conversions in printing code are explicit
       (`gib()` in `src/suite.cpp`).
-- [x] Keep the strict warnings on Windows. **Changed later:** Windows is built with clang-cl (CMake treats it as MSVC),
-      so it uses the same Clang flags as Linux (`DDR5_WARN_FLAGS`) instead of `/W4 /w44365`; `/WX` still comes from
-      `DDR5_WARNINGS_AS_ERRORS`. clang-cl defines `_MSC_VER` and `__clang__`, so the MSVC-intrinsic paths in the sources
-      now apply only to cl.exe (`_MSC_VER && !__clang__`) and clang-cl takes the GNU/builtin paths (`_mm_clflushopt`
-      would need a target-feature flag). Not compiled with clang-cl here (no Windows SDK): the Windows CI job is the
-      first check, and `platform_win.cpp` / `main_gui.cpp` may show warnings no Clang has seen yet.
+- [x] Keep `/W4` on MSVC and add the matching conversion warnings there. `/w44365` adds C4365 (signed/unsigned);
+      C4244/C4267 are already on at `/W4`. Not compiled with MSVC (no Windows toolchain), so the Windows CI job
+      is the first check.
 
 **Done when.** The strict build is warning-free, or each remaining warning has a one-line justification.
 **Result.** Clang 18 strict build: 0 warnings. `unit_tests` and `tools/selftest.sh` pass (the selftest also fails
