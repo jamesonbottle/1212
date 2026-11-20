@@ -209,11 +209,15 @@ so there is no mismatch. A future include of it from an executable's own source 
 function two different definitions (ODR violation).
 
 **Fix.**
-- [ ] Make the definition PUBLIC on the inject library so every target that links it gets it, or move the hook
-      out of the inline function.
-- [ ] Add a CMake comment or check explaining the rule.
+- [x] Make the definition PUBLIC on the inject library so every target that links it gets it, or move the hook
+      out of the inline function. (`ddr5engine_inject` and `ddr5_cpucheck_inject` in `CMakeLists.txt`.)
+- [x] Add a CMake comment or check explaining the rule. (A comment above `ddr5_cpucheck_inject`, plus a configure-time
+      `FATAL_ERROR` if a program links both `ddr5engine` and `ddr5engine_inject`.)
 
 **Done when.** No translation unit of `ddr5test_cli_inject` can see `lineio.h` without the define.
+**Result.** `compile_commands.json` shows `main_cli.cpp` of `ddr5test_cli_inject` compiled with `-DDDR5TEST_INJECT`
+and the normal targets without it. A copy of the project that links both engines into one target fails at configure
+time with a clear message. `unit_tests` and the full `tools/selftest.sh` pass; the strict build has 0 warnings.
 
 ---
 

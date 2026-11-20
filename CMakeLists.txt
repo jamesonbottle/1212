@@ -138,7 +138,12 @@ foreach(lib ddr5_cpucheck ddr5_cpucheck_inject)
     endif()
   endif()
 endforeach()
-target_compile_definitions(ddr5_cpucheck_inject PRIVATE DDR5TEST_INJECT)
+# DDR5TEST_INJECT changes the body of inline functions in headers (src/lineio.h, src/audit.h, src/inject.h). Every
+# translation unit that includes such a header and ends up in one program must see the same value, or the same inline
+# function has two definitions (an ODR violation). So the define is PUBLIC on the inject libraries: any target that
+# links one of them (ddr5test_cli_inject, ...) compiles its own sources with it as well. The rule, checked below:
+#   a program links either the normal engine or the inject engine, never both.
+target_compile_definitions(ddr5_cpucheck_inject PUBLIC DDR5TEST_INJECT)
 
 add_library(ddr5engine STATIC ${ENGINE_SOURCES})
 target_include_directories(ddr5engine PUBLIC src "${DDR5_GENERATED_DIR}")
@@ -147,7 +152,7 @@ target_link_libraries(ddr5engine PUBLIC ddr5_flags ddr5_cpucheck)
 add_library(ddr5engine_inject STATIC ${ENGINE_SOURCES} src/inject.cpp)
 target_include_directories(ddr5engine_inject PUBLIC src "${DDR5_GENERATED_DIR}")
 target_link_libraries(ddr5engine_inject PUBLIC ddr5_flags ddr5_cpucheck_inject)
-target_compile_definitions(ddr5engine_inject PRIVATE DDR5TEST_INJECT)
+target_compile_definitions(ddr5engine_inject PUBLIC DDR5TEST_INJECT) # PUBLIC on purpose, see the rule above
 
 add_executable(ddr5test_cli src/main_cli.cpp)
 target_link_libraries(ddr5test_cli PRIVATE ddr5engine)
@@ -173,6 +178,15 @@ if(WIN32)
   target_link_libraries(ddr5ramtest PRIVATE comctl32 user32 gdi32 advapi32)
   list(APPEND EXES ddr5ramtest)
 endif()
+
+# The inject rule (see ddr5_cpucheck_inject above): fail the configure step if a program links both engines.
+foreach(t IN LISTS EXES flush_order_bench)
+  get_target_property(t_libs ${t} LINK_LIBRARIES)
+  if("ddr5engine" IN_LIST t_libs AND "ddr5engine_inject" IN_LIST t_libs)
+    message(FATAL_ERROR "${t} links both ddr5engine and ddr5engine_inject: DDR5TEST_INJECT would differ between "
+                        "its translation units (ODR violation). Link only one of them.")
+  endif()
+endforeach()
 
 # Tests: `ctest --output-on-failure` (from the build directory).
 enable_testing()
