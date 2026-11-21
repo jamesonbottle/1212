@@ -83,8 +83,8 @@ point 1:
 - `InitCommonControlsEx` already listed only the classes the window uses (tab, up-down, standard); its result is now
   checked and a failure is reported like a window failure.
 - Exit codes are named constants (0, 1, 2); an error from `GetMessageW` returns 1 instead of an uninitialised value.
-- Known interim effect: the window is now per-monitor DPI aware but still lays out at the primary monitor's DPI, so
-  dragging it to a monitor with another scaling shows it at the wrong size until point 4 (`WM_DPICHANGED`) is done.
+- Known interim effect (gone with point 4): the window was per-monitor DPI aware but laid out at the primary monitor's
+  DPI, so dragging it to a monitor with another scaling showed it at the wrong size.
 
 
 ## 3. Window, layout and controls
@@ -112,13 +112,29 @@ tab order follows the visual order.
 ## 4. DPI (per-monitor v2)
 
 **Fix.**
-- [ ] Manifest value from point 2; at run time call `GetDpiForWindow`, not `GetDeviceCaps` once at start.
-- [ ] Handle **`WM_DPICHANGED`**: resize to the suggested rectangle, recreate fonts, re-run layout.
-- [ ] Every size comes from one `Scale(px)` helper that uses the *current* window DPI.
-- [ ] Use `AdjustWindowRectExForDpi` for the window frame.
-- [ ] Dialogs and message boxes are owned by the window so they open on the same monitor.
+- [x] Manifest value from point 2; at run time call `GetDpiForWindow`, not `GetDeviceCaps` once at start.
+- [x] Handle **`WM_DPICHANGED`**: resize to the suggested rectangle, recreate fonts, re-run layout.
+- [x] Every size comes from one `Scale(px)` helper that uses the *current* window DPI.
+- [x] Use `AdjustWindowRectExForDpi` for the window frame.
+- [x] Dialogs and message boxes are owned by the window so they open on the same monitor.
 
 **Done when.** Dragging the window between a 100 % and a 150 % monitor keeps it sharp and correctly laid out.
+
+**Status: done in code, not yet checked on two monitors.** The code is only compiled and tested by GitHub Actions; the
+two-monitor check of the "done when" line needs a real machine (point 14, manual checklist). What changed:
+- `gui_dpi.h/.cpp`: `system_dpi()` (`GetDeviceCaps`, read once) is gone. `window_dpi(HWND)` asks `GetDpiForWindow` each
+  time; `scale_px` and `valid_dpi` are plain C++ in the header and unit tested (`test_gui_dpi`).
+- `build_ui` reads the DPI from the window itself, so the first layout is right for the monitor the window starts on.
+- `WM_DPICHANGED` (`on_dpi_changed`): new DPI, new fonts for every control (`apply_fonts`; the old fonts are deleted only
+  after no control uses them), font units and tab strip measured again, the window resized for the layout at the new
+  DPI with its top-left at the corner Windows suggests, then the layout is re-run. The size comes from the layout, not
+  from the suggested rectangle, so the client area stays exactly what the layout needs when the font rounds differently.
+- `fit_window`: `AdjustWindowRectExForDpi` for the frame; the first placement is centred in the work area of the
+  monitor the window is on, not the primary screen.
+- Message boxes made after the window exists already used the window as owner; the ones with no owner are shown before
+  the window exists (startup failures, second instance) and cannot have one.
+- The interim effect noted in point 2 (wrong size on a monitor with another scaling) is gone.
+- Not done here, belongs to point 13: `WM_SETTINGCHANGE` for a changed text size does not re-create the fonts yet.
 
 ## 5. Input fields and validation
 

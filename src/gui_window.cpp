@@ -8,6 +8,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include "coverage.h"
 #include "gui_dpi.h"
@@ -168,6 +169,31 @@ struct MainWindow::Impl {
         return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
     }
 
+    // The tab control is only the strip of tabs. Its height is what the display area starts at, measured at the size it
+    // is created with (scaled to the current DPI) and with the current font.
+    void measure_tab_strip() {
+        RECT strip{0, 0, scale_px(200, dpi), scale_px(100, dpi)};
+        TabCtrl_AdjustRect(tab, FALSE, &strip);
+        metrics.tabStrip = strip.top > 0 ? strip.top : layout::dlu_y(14, metrics);
+    }
+
+    // The window moved to a monitor with another DPI (or the first fonts are made): new fonts for the new DPI go to
+    // every control, then the measures that depend on the font are taken again. The old fonts are deleted only after
+    // no control uses them any more.
+    void apply_fonts() {
+        Font newFont, newBig;
+        font = make_font(newFont, false);
+        fontBig = make_font(newBig, true);
+        for (size_t i = 0; i < hwnds.size(); ++i)
+            if (hwnds[i])
+                SendMessageW(hwnds[i], WM_SETFONT,
+                             reinterpret_cast<WPARAM>(kControls[i].kind == Kind::Button ? fontBig : font), TRUE);
+        ownedFont = std::move(newFont);
+        ownedBigFont = std::move(newBig);
+        measure_font();
+        measure_tab_strip();
+    }
+
     // Dialog base units of the window font: the average character width and the text height, measured the way
     // Windows documents it (MapDialogRect does the same for dialogs).
     void measure_font() {
@@ -293,18 +319,52 @@ struct MainWindow::Impl {
                 SendMessageW(hwnds[i], UDM_SETBUDDY, reinterpret_cast<WPARAM>(item(kControls[i].buddy)), 0);
     }
 
-    // Sizes the window so that its client area is exactly what the layout needs, and centres it on the screen.
-    bool fit_window() {
+    // Sizes the window so that its client area is exactly what the layout needs at the current DPI (the frame is
+    // computed for that DPI too). With `corner` the window's top-left goes there (the corner Windows suggests in
+    // WM_DPICHANGED, so the window stays on the monitor it was dragged to); without it the window is centred in the
+    // work area of the monitor it is on.
+    bool fit_window(const POINT* corner = nullptr) {
         const int clientW = layout::dlu_x(layout::kClientWidth, metrics);
         const Result r = layout::compute(kControls, kControlCount, clientW, metrics);
         const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(wnd, GWL_STYLE));
         const DWORD ex = static_cast<DWORD>(GetWindowLongPtrW(wnd, GWL_EXSTYLE));
         RECT rc{0, 0, clientW, r.contentHeight};
-        AdjustWindowRectEx(&rc, style, FALSE, ex);
+        if (!AdjustWindowRectExForDpi(&rc, style, FALSE, ex, static_cast<UINT>(dpi)))
+            return false;
         const int width = rc.right - rc.left, height = rc.bottom - rc.top;
-        const int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
-        return SetWindowPos(wnd, nullptr, (sw - width) / 2, (sh - height) / 3, width, height,
-                            SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+        int x = 0, y = 0;
+        if (corner) {
+            x = corner->x;
+            y = corner->y;
+        } else {
+            RECT area{0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)}; // fallback: primary screen
+            MONITORINFO mi{};
+            mi.cbSize = sizeof mi;
+            if (GetMonitorInfoW(MonitorFromWindow(wnd, MONITOR_DEFAULTTONEAREST), &mi))
+                area = mi.rcWork;
+            x = area.left + (area.right - area.left - width) / 2;
+            y = area.top + (area.bottom - area.top - height) / 3;
+        }
+        return SetWindowPos(wnd, nullptr, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+    }
+
+    // WM_DPICHANGED: the window is now on a monitor with another DPI. Fonts are made again for it, the window is
+    // resized for the layout at the new DPI (its top-left is the corner Windows suggests), and every control is moved.
+    void on_dpi_changed(int newDpi, const RECT* suggested) {
+        dpi = newDpi;
+        if (!built)
+            return; // still in WM_CREATE: build_ui reads the DPI itself
+        apply_fonts();
+        POINT corner{};
+        if (suggested) {
+            corner.x = suggested->left;
+            corner.y = suggested->top;
+        }
+        // When fit_window fails the window keeps its size; the controls are laid out for the new font in any case. The
+        // layout is also run here because an unchanged window size sends no WM_SIZE, while the fonts did change.
+        fit_window(suggested ? &corner : nullptr);
+        relayout();
+        RedrawWindow(wnd, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
     }
 
     void set_running_ui(bool running) {
@@ -460,6 +520,7 @@ struct MainWindow::Impl {
 
     bool build_ui() {
         highContrast = query_high_contrast();
+        dpi = window_dpi(wnd); // the DPI of the monitor the window was created on (per-monitor v2)
         font = make_font(ownedFont, false);
         fontBig = make_font(ownedBigFont, true);
         measure_font();
@@ -483,11 +544,7 @@ struct MainWindow::Impl {
         ti.pszText = const_cast<LPWSTR>(kTabAdvanced);
         if (TabCtrl_InsertItem(tab, 1, &ti) < 0)
             return false;
-        // The tab control is only the strip of tabs. Its height is what the display area starts at, measured at the
-        // size it was created with.
-        RECT strip{0, 0, scale_px(200, dpi), scale_px(100, dpi)};
-        TabCtrl_AdjustRect(tab, FALSE, &strip);
-        metrics.tabStrip = strip.top > 0 ? strip.top : layout::dlu_y(14, metrics);
+        measure_tab_strip();
 
         hTotal = item(ID_TOTAL);
         hFree = item(ID_FREE);
@@ -565,6 +622,9 @@ struct MainWindow::Impl {
         case WM_SIZE:
             if (wp != SIZE_MINIMIZED)
                 relayout();
+            return 0;
+        case WM_DPICHANGED: // per-monitor v2: HIWORD(wp) is the new DPI, lp the rectangle Windows suggests
+            on_dpi_changed(valid_dpi(HIWORD(wp)), reinterpret_cast<const RECT*>(lp));
             return 0;
         case WM_ACTIVATE: {
             const LRESULT r = DefWindowProcW(h, msg, wp, lp);
@@ -684,8 +744,7 @@ std::unique_ptr<MainWindow> MainWindow::create(HINSTANCE inst, int show) {
     std::unique_ptr<MainWindow> mw(new MainWindow());
     mw->impl_ = std::make_unique<Impl>();
     Impl& w = *mw->impl_;
-    w.inst = inst;
-    w.dpi = system_dpi();
+    w.inst = inst; // w.dpi is set from the window itself in WM_CREATE (build_ui)
 
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof wc;

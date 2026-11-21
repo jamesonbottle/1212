@@ -22,6 +22,7 @@
 #include "flush.h"
 #include "lineio.h"
 #include "gen.h"
+#include "gui_dpi.h"
 #include "gui_layout.h"
 #include "log.h"
 #include "order.h"
@@ -2539,6 +2540,38 @@ static void test_gui_layout() {
     }
 }
 
+// DPI arithmetic of the GUI (per-monitor v2): scaling to the window's DPI and making a reported DPI usable.
+static void test_gui_dpi() {
+    using namespace ddr5::gui;
+    CHECK(kBaseDpi == 96, "100 %% scaling is 96 DPI");
+    // the usual Windows scale steps: 100, 125, 150, 175, 200, 300 %
+    CHECK(scale_px(100, 96) == 100 && scale_px(100, 120) == 125 && scale_px(100, 144) == 150 &&
+              scale_px(100, 168) == 175 && scale_px(100, 192) == 200 && scale_px(100, 288) == 300,
+          "scale_px at the standard DPI steps");
+    for (int px = 0; px <= 2000; ++px)
+        CHECK(scale_px(px, 96) == px, "scale_px at 96 DPI changes %d", px);
+    // rounding: to the nearest pixel, halves away from zero (what MulDiv did before)
+    CHECK(scale_px(7, 120) == 9, "8.75 rounds up to 9");
+    CHECK(scale_px(5, 120) == 6, "6.25 rounds down to 6");
+    CHECK(scale_px(1, 144) == 2 && scale_px(3, 144) == 5, "1.5 and 4.5 round away from zero");
+    CHECK(scale_px(-1, 144) == -2 && scale_px(-3, 144) == -5 && scale_px(-7, 120) == -9, "negative values mirror");
+    CHECK(scale_px(0, 288) == 0, "zero stays zero");
+    // a window dragged to a bigger monitor never gets smaller, and a size scales both ways to within a pixel
+    for (int dpi = 96; dpi <= 480; dpi += 24) {
+        int prev = -1;
+        for (int px = 0; px <= 400; ++px) {
+            const int v = scale_px(px, dpi);
+            CHECK(v >= prev, "scale_px is not monotonic at %d px, %d DPI", px, dpi);
+            prev = v;
+        }
+    }
+    // no overflow for large values (the product is 64 bit)
+    CHECK(scale_px(2000000000, 96) == 2000000000, "large value at 96 DPI");
+    // valid_dpi: a failed call (0), nonsense and anything below 96 become 96; real values pass through
+    CHECK(valid_dpi(0) == 96 && valid_dpi(-1) == 96 && valid_dpi(95) == 96 && valid_dpi(96) == 96, "valid_dpi floor");
+    CHECK(valid_dpi(120) == 120 && valid_dpi(144) == 144 && valid_dpi(480) == 480, "valid_dpi passes real values");
+}
+
 int main() {
     test_log.sink = [](const std::string& s) {
         printf("  (engine) %s", s.c_str());
@@ -2565,6 +2598,7 @@ int main() {
     test_start_guard();
     test_stop_gate();
     test_gui_layout();
+    test_gui_dpi();
     test_keep_awake();
     test_cpu_set();
     test_coverage_map();

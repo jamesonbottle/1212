@@ -4,17 +4,9 @@
 
 namespace ddr5::gui {
 
-int system_dpi() {
-    int dpi = 96;
-    if (HDC dc = GetDC(nullptr)) {
-        dpi = GetDeviceCaps(dc, LOGPIXELSX);
-        ReleaseDC(nullptr, dc);
-    }
-    return dpi < 96 ? 96 : dpi;
-}
-
-int scale_px(int px, int dpi) {
-    return MulDiv(px, dpi, 96);
+// GetDpiForWindow returns 0 for a bad handle; valid_dpi() then gives 96.
+int window_dpi(HWND__* wnd) {
+    return valid_dpi(static_cast<int>(GetDpiForWindow(wnd)));
 }
 
 } // namespace ddr5::gui
