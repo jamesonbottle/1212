@@ -547,8 +547,12 @@ MainWindow::MainWindow() = default;
 MainWindow::~MainWindow() = default;
 
 std::unique_ptr<MainWindow> MainWindow::create(HINSTANCE inst, int show) {
+    // Only the classes this window uses: tab, up-down, and the standard ones (button, edit, static, combo box).
     INITCOMMONCONTROLSEX icc{sizeof icc, ICC_TAB_CLASSES | ICC_UPDOWN_CLASS | ICC_STANDARD_CLASSES};
-    InitCommonControlsEx(&icc);
+    if (!InitCommonControlsEx(&icc)) {
+        MessageBoxW(nullptr, kWindowFailed, kAppTitle, MB_OK | MB_ICONERROR);
+        return nullptr;
+    }
 
     std::unique_ptr<MainWindow> mw(new MainWindow());
     mw->impl_ = std::make_unique<Impl>();
