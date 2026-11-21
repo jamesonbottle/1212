@@ -2,6 +2,7 @@
 #include <cmath>
 #include <set>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <map>
@@ -21,6 +22,7 @@
 #include "flush.h"
 #include "lineio.h"
 #include "gen.h"
+#include "gui_layout.h"
 #include "log.h"
 #include "order.h"
 #include "params.h"
@@ -2394,6 +2396,149 @@ static void test_extra_algos() {
     }
 }
 
+// The GUI's control table and rectangles (gui_layout.h): pure geometry, so it is checked here on every platform.
+static void test_gui_layout() {
+    using namespace ddr5::gui::layout;
+    auto rect_at = [](const Result& res, int i) -> const Rect& {
+        return res.rect[static_cast<std::size_t>(i)];
+    };
+    const Control* t = kControls;
+    const int n = static_cast<int>(kControlCount);
+
+    // Table rules: creation order is z-order and Tab order, so the tab strip is first and the rest is in reading order.
+    CHECK(n > 0 && t[0].kind == Kind::Tab, "the tab strip must be created first");
+    int prevKey = -1;
+    for (int i = 0; i < n; ++i) {
+        const Control& c = t[i];
+        if (i > 0) {
+            CHECK(c.page == 0 || c.page == 1, "control %d: page %d", i, c.page);
+            const int key = c.page * 100000 + c.row * 100 + (c.kind == Kind::Group ? 0 : 1 + c.col);
+            CHECK(key >= prevKey, "control %d is out of reading order (page %d row %d col %d)", i, c.page, c.row,
+                  c.col);
+            prevKey = key;
+        }
+        CHECK(c.id == 0 || c.id >= 100, "control %d: id %d collides with the ids Windows gives dialog buttons", i,
+              c.id);
+        for (int j = i + 1; j < n; ++j)
+            CHECK(c.id == 0 || c.id != t[j].id, "controls %d and %d share id %d", i, j, c.id);
+        if (c.kind == Kind::Spin) {
+            int b = -1;
+            for (int j = 0; j < i; ++j)
+                if (t[j].id == c.buddy && t[j].kind == Kind::Edit && t[j].page == c.page && t[j].row == c.row)
+                    b = j;
+            CHECK(b >= 0, "spin %d: its edit must be created before it, on the same row", c.id);
+        }
+    }
+    for (int page = 0; page < kPageCount; ++page) {
+        int lastRow = -1, groupEnd = -1;
+        for (int i = 1; i < n; ++i)
+            if (t[i].page == page)
+                lastRow = std::max(lastRow, t[i].row);
+        for (int row = 0; row <= lastRow; ++row) {
+            bool any = false;
+            for (int i = 1; i < n; ++i)
+                if (t[i].page == page && t[i].row == row && t[i].kind != Kind::Group)
+                    any = true;
+            CHECK(any, "page %d: row %d has no control", page, row);
+        }
+        for (int i = 1; i < n; ++i) {
+            if (t[i].page != page || t[i].kind != Kind::Group)
+                continue;
+            CHECK(t[i].row > groupEnd, "page %d: group boxes overlap at row %d", page, t[i].row);
+            CHECK(t[i].rowSpan >= 1 && t[i].row + t[i].rowSpan - 1 <= lastRow, "page %d: group at row %d runs out",
+                  page, t[i].row);
+            groupEnd = t[i].row + t[i].rowSpan - 1;
+        }
+    }
+
+    // Dialog units: 4 horizontal units are one average character, 8 vertical units one text height.
+    Metrics unit;
+    CHECK(dlu_x(4, unit) == unit.baseX && dlu_y(8, unit) == unit.baseY, "dialog unit conversion");
+    CHECK(mul_div(10, 6, 4) == 15 && mul_div(3, 6, 4) == 5 && mul_div(0, 6, 4) == 0, "mul_div rounding");
+
+    // Geometry for a range of fonts (small to large text size / DPI).
+    const int baseXs[] = {5, 6, 7, 9, 12};
+    const int baseYs[] = {12, 15, 20, 30};
+    for (const int bx : baseXs) {
+        for (const int by : baseYs) {
+            Metrics m;
+            m.baseX = bx;
+            m.baseY = by;
+            m.tabStrip = by + 9;
+            const int w = dlu_x(kClientWidth, m);
+            const Result r = compute(t, kControlCount, w, m);
+            CHECK(static_cast<int>(r.rect.size()) == n, "one rectangle per control");
+            if (static_cast<int>(r.rect.size()) != n)
+                continue;
+            // the height a control takes in its row (a combo box is measured closed, its open list is not in the way)
+            auto closed_h = [&](int i) {
+                return t[i].kind == Kind::Combo ? dlu_y(cell_dlu(Kind::Combo), m) : rect_at(r, i).h;
+            };
+            auto in_group = [&](int i, int g) {
+                return t[g].kind == Kind::Group && t[g].page == t[i].page && t[i].row >= t[g].row &&
+                       t[i].row < t[g].row + t[g].rowSpan;
+            };
+            for (int i = 0; i < n; ++i) {
+                const Rect& a = rect_at(r, i);
+                if (t[i].kind == Kind::Spin) {
+                    CHECK(a.w == 0 && a.h == 0, "spin %d is placed by its buddy", t[i].id);
+                    continue;
+                }
+                CHECK(a.w > 0 && closed_h(i) > 0, "bx=%d by=%d control %d has no size", bx, by, i);
+                CHECK(a.x >= 0 && a.x + a.w <= w, "bx=%d by=%d control %d leaves the window sideways", bx, by, i);
+                CHECK(a.y >= 0 && a.y + closed_h(i) <= r.contentHeight, "bx=%d by=%d control %d leaves the window", bx,
+                      by, i);
+                for (int g = 1; g < n; ++g) {
+                    if (t[i].kind == Kind::Group || !in_group(i, g))
+                        continue;
+                    const Rect& b = rect_at(r, g);
+                    CHECK(a.x >= b.x && a.x + a.w <= b.x + b.w && a.y >= b.y && a.y + closed_h(i) <= b.y + b.h,
+                          "bx=%d by=%d control %d is not inside its group box", bx, by, i);
+                }
+                for (int j = i + 1; j < n; ++j) {
+                    if (t[i].kind == Kind::Group || t[j].kind == Kind::Group || t[j].kind == Kind::Spin)
+                        continue;
+                    if (t[i].page >= 0 && t[j].page >= 0 && t[i].page != t[j].page)
+                        continue; // the two pages share the same area; only one is shown
+                    const Rect& b = rect_at(r, j);
+                    const bool overlap =
+                        a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + closed_h(j) && b.y < a.y + closed_h(i);
+                    CHECK(!overlap, "bx=%d by=%d controls %d and %d overlap", bx, by, i, j);
+                }
+                if (t[i].kind == Kind::Edit) { // the label before a field sits level with it
+                    const Rect& l = rect_at(r, i - 1);
+                    CHECK(t[i - 1].kind == Kind::Label, "an edit must follow its label in the table");
+                    CHECK(std::abs((l.y + l.h / 2) - (a.y + a.h / 2)) <= 1,
+                          "bx=%d by=%d label of control %d is not level", bx, by, i);
+                }
+            }
+        }
+    }
+
+    // The layout follows the font: twice the text size gives about twice the size, and a wider window only widens.
+    Metrics m1, m2;
+    m1.baseX = 6;
+    m1.baseY = 15;
+    m1.tabStrip = 24;
+    m2.baseX = 12;
+    m2.baseY = 30;
+    m2.tabStrip = 48;
+    const Result a1 = compute(t, kControlCount, dlu_x(kClientWidth, m1), m1);
+    const Result a2 = compute(t, kControlCount, dlu_x(kClientWidth, m2), m2);
+    CHECK(a1.contentHeight > 0 && std::abs(a2.contentHeight - 2 * a1.contentHeight) <= 60,
+          "content height %d at 1x, %d at 2x", a1.contentHeight, a2.contentHeight);
+    const Result wide = compute(t, kControlCount, dlu_x(kClientWidth, m1) + 100, m1);
+    CHECK(wide.contentHeight == a1.contentHeight, "a wider window must not change the height");
+    for (int i = 1; i < n; ++i) {
+        if (t[i].kind == Kind::Spin)
+            continue;
+        const int dw = rect_at(wide, i).w - rect_at(a1, i).w;
+        const bool grows = t[i].kind == Kind::Group || t[i].colSpan >= 2 || t[i].col == 1;
+        CHECK(dw == (grows ? 100 : 0), "control %d: width changed by %d for 100 more pixels", i, dw);
+        CHECK(rect_at(wide, i).y == rect_at(a1, i).y, "control %d moved vertically when the window got wider", i);
+    }
+}
+
 int main() {
     test_log.sink = [](const std::string& s) {
         printf("  (engine) %s", s.c_str());
@@ -2419,6 +2564,7 @@ int main() {
     test_sizing();
     test_start_guard();
     test_stop_gate();
+    test_gui_layout();
     test_keep_awake();
     test_cpu_set();
     test_coverage_map();

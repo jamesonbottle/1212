@@ -17,8 +17,4 @@ int scale_px(int px, int dpi) {
     return MulDiv(px, dpi, 96);
 }
 
-int font_height_px(int points, int dpi) {
-    return -MulDiv(points, dpi, 72);
-}
-
 } // namespace ddr5::gui

@@ -23,6 +23,8 @@ inline constexpr const wchar_t* kCouldNotStartSuffix = L").";
 inline constexpr const wchar_t* kCouldNotStartPlain = L"The test could not start.";
 
 // ---- tabs, groups and labels ----
+// An & in a caption marks its Alt+letter key (a label moves focus to the field after it). Each letter is used once
+// in the window: S (Start/Stop), M, R, B, E on the Testing page; C, G, T, F on the Advanced page; Q (Force quit).
 inline constexpr const wchar_t* kTabTesting = L"Testing";
 inline constexpr const wchar_t* kTabAdvanced = L"Advanced";
 inline constexpr const wchar_t* kGroupSystem = L"System status";
@@ -32,17 +34,17 @@ inline constexpr const wchar_t* kGroupAdvanced = L"Advanced";
 inline constexpr const wchar_t* kGroupExperimental = L"Experimental";
 inline constexpr const wchar_t* kLabelTotal = L"Total memory:";
 inline constexpr const wchar_t* kLabelFree = L"Free memory:";
-inline constexpr const wchar_t* kLabelMegabytes = L"Megabytes:";
-inline constexpr const wchar_t* kLabelThreads = L"Threads:";
+inline constexpr const wchar_t* kLabelMegabytes = L"&Megabytes:";
+inline constexpr const wchar_t* kLabelThreads = L"Th&reads:";
 inline constexpr const wchar_t* kLabelDuration = L"Duration:";
 inline constexpr const wchar_t* kLabelPages = L"Pages verified:";
 inline constexpr const wchar_t* kLabelErrors = L"Error count:";
-inline constexpr const wchar_t* kLabelCache = L"CPU cache:";
-inline constexpr const wchar_t* kLabelRng = L"RNG:";
-inline constexpr const wchar_t* kLabelSet = L"Test set:";
-inline constexpr const wchar_t* kCheckBeep = L"Beep on error";
-inline constexpr const wchar_t* kCheckStopOnError = L"Stop on error";
-inline constexpr const wchar_t* kCheckFpu = L"Stress FPU";
+inline constexpr const wchar_t* kLabelCache = L"CPU &cache:";
+inline constexpr const wchar_t* kLabelRng = L"RN&G:";
+inline constexpr const wchar_t* kLabelSet = L"&Test set:";
+inline constexpr const wchar_t* kCheckBeep = L"&Beep on error";
+inline constexpr const wchar_t* kCheckStopOnError = L"Stop on &error";
+inline constexpr const wchar_t* kCheckFpu = L"Stress &FPU";
 inline constexpr const wchar_t* kAdvancedHelp =
     L"CPU cache: Default follows each test; Bypass reads straight from DRAM (clflush every access); Cached uses "
     L"normal write-back traffic; Non-temporal uses streaming stores.\n\n"
@@ -55,9 +57,9 @@ inline constexpr const wchar_t* kRngItems[] = {L"Default", L"SplitMix64", L"Murm
 inline constexpr const wchar_t* kSetItems[] = {L"Full", L"Quick"};
 
 // ---- the Start button and the status line ----
-inline constexpr const wchar_t* kStart = L"Start";
-inline constexpr const wchar_t* kStop = L"Stop";
-inline constexpr const wchar_t* kForceQuit = L"Force quit";
+inline constexpr const wchar_t* kStart = L"&Start";
+inline constexpr const wchar_t* kStop = L"&Stop";
+inline constexpr const wchar_t* kForceQuit = L"Force &quit";
 inline constexpr const wchar_t* kStopping = L"Stopping...";
 inline constexpr const wchar_t* kStoppingThenClosing = L"Stopping, then closing...";
 inline constexpr const wchar_t* kStuck = L"Stuck? Force quit ends the program";

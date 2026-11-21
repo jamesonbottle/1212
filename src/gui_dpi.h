@@ -10,7 +10,4 @@ int system_dpi();
 // `px` pixels designed for 96 DPI, scaled to `dpi`.
 int scale_px(int px, int dpi);
 
-// Height for CreateFontW of a font of `points` points at `dpi` (negative: character height).
-int font_height_px(int points, int dpi);
-
 } // namespace ddr5::gui
