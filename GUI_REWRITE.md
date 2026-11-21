@@ -60,17 +60,32 @@ are reported, fonts are deleted, and the planned memory and thread values are wr
 ## 2. Entry point, manifest and single instance
 
 **Fix.**
-- [ ] Use `wWinMain` (UTF-16 command line).
-- [ ] Manifest: `<dpiAwareness>PerMonitorV2</dpiAwareness>` plus `<dpiAware>true/pm</dpiAware>` fallback,
+- [x] Use `wWinMain` (UTF-16 command line).
+- [x] Manifest: `<dpiAwareness>PerMonitorV2</dpiAwareness>` plus `<dpiAware>true/pm</dpiAware>` fallback,
       `<longPathAware>`, UTF-8 `activeCodePage`, Common Controls 6, `supportedOS` for Windows 10/11 only (drop the old OS
       ids), `asInvoker`.
-- [ ] Keep the check for AVX2 first, before anything else runs.
-- [ ] Keep the single-instance mutex (`Global\...`), and bring the first window forward with a registered window message
+- [x] Keep the check for AVX2 first, before anything else runs.
+- [x] Keep the single-instance mutex (`Global\...`), and bring the first window forward with a registered window message
       or `FindWindow` retry as today; handle `ERROR_ACCESS_DENIED` the same way.
-- [ ] `InitCommonControlsEx` with only the classes used.
-- [ ] Return a real exit code (0 normal, 1 window creation failed, 2 not supported CPU).
+- [x] `InitCommonControlsEx` with only the classes used.
+- [x] Return a real exit code (0 normal, 1 window creation failed, 2 not supported CPU).
 
 **Done when.** The exe starts only on Windows 10 or later, and a second start activates the first.
+
+**Status: done.** Built and tested only by GitHub Actions (all jobs pass, including the Windows build with `/W4 /w44365
+/WX`). The exe has still not been started on a real machine (point 14), so "starts only on Windows 10 or later" and
+"a second start activates the first" are not yet confirmed there. What changed, and what was already in place from
+point 1:
+- `wWinMain`, the AVX2 check before anything else, the `Global\` mutex with the `ERROR_ACCESS_DENIED` case and the
+  `FindWindow` retry were already there and are kept. The mutex handle is now closed by a guard instead of being leaked.
+- Manifest: `PerMonitorV2` plus the `true/pm` fallback, `longPathAware`, UTF-8 `activeCodePage` added. `supportedOS` was
+  already only the Windows 10/11 id; Common Controls 6 and `asInvoker` unchanged.
+- `InitCommonControlsEx` already listed only the classes the window uses (tab, up-down, standard); its result is now
+  checked and a failure is reported like a window failure.
+- Exit codes are named constants (0, 1, 2); an error from `GetMessageW` returns 1 instead of an uninitialised value.
+- Known interim effect: the window is now per-monitor DPI aware but still lays out at the primary monitor's DPI, so
+  dragging it to a monitor with another scaling shows it at the wrong size until point 4 (`WM_DPICHANGED`) is done.
+
 
 ## 3. Window, layout and controls
 
