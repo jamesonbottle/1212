@@ -37,15 +37,25 @@ Constraints:
 **Problem.** Layout, run control, log file and state live in one file and one global.
 
 **Fix.**
-- [ ] `gui_main.cpp`: `wWinMain`, single-instance check, AVX2 check, message loop only.
-- [ ] `gui_window.cpp/.h`: window class, `WndProc`, control creation, layout.
-- [ ] `gui_run.cpp/.h`: starts and stops the engine, owns `Run`, the worker thread and the log writer.
-- [ ] `gui_model.h`: plain data (`UiState`, form values, result text) with no Win32 types, so it can be unit tested.
-- [ ] `gui_text.cpp/.h`: UTF-8 to UTF-16 helpers and all user-visible strings.
-- [ ] `gui_dpi.cpp/.h`: DPI helpers (point 4).
-- [ ] CMake: the GUI target lists these files; `app.rc` and `app.manifest` stay.
+- [x] `gui_main.cpp`: `wWinMain`, single-instance check, AVX2 check, message loop only.
+- [x] `gui_window.cpp/.h`: window class, `WndProc`, control creation, layout.
+- [x] `gui_run.cpp/.h`: starts and stops the engine, owns `Run`, the worker thread and the log writer.
+- [x] `gui_model.h`: plain data (form values, result text) with no Win32 types, so it can be unit tested. `UiState`
+      comes with the state machine of point 7.
+- [x] `gui_text.cpp/.h`: UTF-8 to UTF-16 helpers and all user-visible strings.
+- [x] `gui_dpi.cpp/.h`: DPI helpers (point 4).
+- [x] CMake: the GUI target lists these files; `app.rc` and `app.manifest` stay. `gui_run.cpp` is built as the
+      `ddr5gui_logic` library on every platform, so the Linux (Clang) CI job compiles it too.
+- [x] `gui_win.h` (not in the first list): the one header that includes `<windows.h>` (Unicode, `NOMINMAX`, lean).
 
 **Done when.** The old `main_gui.cpp` is gone, the GUI builds, and no file mixes Win32 calls with run logic.
+
+**Status: done.** Built and tested only by GitHub Actions (Clang on Linux, MSVC `/W4 /w44365 /WX` on Windows): format,
+Linux build and unit tests, self-test (none, ASan+UBSan, TSan) and the Windows build all pass. The GUI has still not
+been run on a real machine (see point 14). Behaviour is unchanged except: no `A` calls (`MessageBoxA` removed),
+engine text goes through `MultiByteToWideChar`, failures to register the class, create the window or set the timer
+are reported, fonts are deleted, and the planned memory and thread values are written back to the fields together
+(one `setting` guard).
 
 ## 2. Entry point, manifest and single instance
 
