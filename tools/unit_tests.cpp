@@ -2543,7 +2543,7 @@ static void test_gui_layout() {
 // DPI arithmetic of the GUI (per-monitor v2): scaling to the window's DPI and making a reported DPI usable.
 static void test_gui_dpi() {
     using namespace ddr5::gui;
-    CHECK(kBaseDpi == 96, "100 %% scaling is 96 DPI");
+    static_assert(kBaseDpi == 96, "100 % scaling is 96 DPI"); // a compile-time fact: CHECK would be warning C4127
     // the usual Windows scale steps: 100, 125, 150, 175, 200, 300 %
     CHECK(scale_px(100, 96) == 100 && scale_px(100, 120) == 125 && scale_px(100, 144) == 150 &&
               scale_px(100, 168) == 175 && scale_px(100, 192) == 200 && scale_px(100, 288) == 300,
