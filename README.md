@@ -151,7 +151,7 @@ covers both).
 
 | Path | Contents |
 | --- | --- |
-| `src/` | Engine (`algo_*.cpp`, `run.h`, `suite*.cpp`, `platform_*.cpp`) and front-ends (`main_cli.cpp`, `main_gui.cpp`). |
+| `src/` | Engine (`algo_*.cpp`, `run.h`, `suite*.cpp`, `platform_*.cpp`) and front-ends: the CLI (`main_cli.cpp`) and the Windows GUI (`gui_main.cpp` entry point, `gui_window.*` window, `gui_run.*` run control and log, `gui_model.h` rules, `gui_text.*` strings, `gui_dpi.*` DPI). |
 | `tools/unit_tests.cpp` | Unit tests. |
 | `tools/selftest.sh`, `tools/inject_checks.sh` | Linux self-test and fault-injection checks. |
 | `tools/format.sh` | clang-format wrapper. |

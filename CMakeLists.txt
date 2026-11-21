@@ -169,10 +169,17 @@ set(EXES ddr5test_cli ddr5test_cli_inject unit_tests)
 add_executable(flush_order_bench EXCLUDE_FROM_ALL tools/flush_order_bench.cpp)
 target_link_libraries(flush_order_bench PRIVATE ddr5engine)
 
+# The GUI's run control, log writer and rules (src/gui_run.cpp, src/gui_model.h): no Win32 calls, so it is built on every
+# platform (Clang on Linux, MSVC on Windows) and the Linux CI job compiles it even though the window is Windows only.
+add_library(ddr5gui_logic STATIC src/gui_run.cpp)
+target_include_directories(ddr5gui_logic PUBLIC src)
+target_link_libraries(ddr5gui_logic PUBLIC ddr5engine)
+
 if(WIN32)
   enable_language(RC)
-  add_executable(ddr5ramtest WIN32 src/main_gui.cpp src/app.rc)
-  target_link_libraries(ddr5ramtest PRIVATE ddr5engine)
+  # Entry point, window, DPI helpers and text conversion: the only files that include <windows.h> (via src/gui_win.h).
+  add_executable(ddr5ramtest WIN32 src/gui_main.cpp src/gui_window.cpp src/gui_text.cpp src/gui_dpi.cpp src/app.rc)
+  target_link_libraries(ddr5ramtest PRIVATE ddr5gui_logic ddr5engine)
   target_include_directories(ddr5ramtest PRIVATE "${DDR5_GENERATED_DIR}") # app.rc includes build_version.h
   target_link_options(ddr5ramtest PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)   # the manifest is embedded by app.rc
   target_link_libraries(ddr5ramtest PRIVATE comctl32 user32 gdi32 advapi32)

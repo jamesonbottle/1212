@@ -37,7 +37,7 @@ jobs:
         # Findings are listed in the log; .clang-tidy sets WarningsAsErrors to empty, so they do not fail the job.
         run: |
           clang-tidy-18 -p build/cmake --quiet \
-            $(ls src/*.cpp | grep -v -e main_gui.cpp -e platform_win.cpp -e inject.cpp) \
+            $(ls src/*.cpp | grep -v -e gui_main.cpp -e gui_window.cpp -e gui_text.cpp -e gui_dpi.cpp -e platform_win.cpp -e inject.cpp) \
             2>&1 | tee tidy.log
       - name: Summary
         run: echo "clang-tidy warnings:" "$(grep -c 'warning:' tidy.log || true)"
@@ -50,7 +50,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build/cmake -DCMAKE_CXX_COMPILER=clang++
       - name: Build
-        run: cmake --build build/cmake --target ddr5test_cli ddr5test_cli_inject unit_tests -j "$(nproc)"
+        run: cmake --build build/cmake --target ddr5test_cli ddr5test_cli_inject unit_tests ddr5gui_logic -j "$(nproc)"
       - name: Unit tests
         run: build/unit_tests
 
