@@ -120,8 +120,10 @@ tab order follows the visual order.
 
 **Done when.** Dragging the window between a 100 % and a 150 % monitor keeps it sharp and correctly laid out.
 
-**Status: done in code, not yet checked on two monitors.** The code is only compiled and tested by GitHub Actions; the
-two-monitor check of the "done when" line needs a real machine (point 14, manual checklist). What changed:
+**Status: done.** Built and tested only by GitHub Actions (format, Linux build and unit tests, self-test with none,
+ASan+UBSan and TSan, and the Windows build with `/W4 /w44365 /WX`, which also links the GUI) and all of it passes. The
+GUI has still not been run on a real machine, and the "done when" line (dragging between a 100 % and a 150 % monitor)
+needs two monitors: it stays on the manual checklist of point 14. What changed:
 - `gui_dpi.h/.cpp`: `system_dpi()` (`GetDeviceCaps`, read once) is gone. `window_dpi(HWND)` asks `GetDpiForWindow` each
   time; `scale_px` and `valid_dpi` are plain C++ in the header and unit tested (`test_gui_dpi`).
 - `build_ui` reads the DPI from the window itself, so the first layout is right for the monitor the window starts on.
