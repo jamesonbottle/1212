@@ -184,11 +184,11 @@ point 14. What changed:
 ## 6. Settings sent to the engine
 
 **Fix.**
-- [ ] Build `Settings` from validated form values in one function (`gui_model.h`), no Win32 calls inside, unit tested.
-- [ ] Add the missing options the engine has and the GUI does not: **"Allow running with unlocked memory"** (default off,
+- [x] Build `Settings` from validated form values in one function (`gui_model.h`), no Win32 calls inside, unit tested.
+- [x] Add the missing options the engine has and the GUI does not: **"Allow running with unlocked memory"** (default off,
       with a warning text; today the GUI forces it on), **maximum errors logged** (`maxLog`), **loops/time limit** and
       **coverage target** (the engine already supports them).
-- [ ] Keep "Advanced" settings on a second tab; the defaults stay what they are today. The limits (loops, minutes,
+- [x] Keep "Advanced" settings on a second tab; the defaults stay what they are today. The limits (loops, minutes,
       coverage target, errors written) go on a third tab, "Limits".
 - The GUI **does not save its settings**: nothing is written to disk to remember the form between runs, so every start
   shows the defaults. (Decision: no settings file, no registry key. The log of point 10 is a separate matter.)
@@ -196,6 +196,24 @@ point 14. What changed:
 **Done when.** Every engine option that makes sense for a GUI is either shown or deliberately listed as CLI-only.
 CLI-only: `-f` (test name filter), `--seed`, `--flush`, `--test-seconds`, `--log FILE` (the GUI has its own log, point
 10), `--no-large-pages` (the GUI always asks for them; point 7 shows whether it got them), `--list`, `--version`.
+
+**Status: done.** Built and tested only by GitHub Actions (format, clang-tidy report, Linux build and unit tests, self-test
+with none, ASan+UBSan and TSan, and the Windows build with `/W4 /w44365 /WX`, which also links the GUI) and all of it
+passed on commit 41d9c9b. The GUI has still not been run on a real machine. What changed:
+- Building `Settings` from the checked form in one function was already done with point 5 (`settings_from_form`); it now
+  also passes the new options.
+- Advanced tab: **Allow unlocked memory**, off by default (the GUI used to force it on), with a warning text. A run the
+  engine refuses because the memory could not be locked now says so in the GUI's words and names this box (the engine's
+  last line names the command line option `--allow-unlocked`). Because of the new default, a machine where locking fails
+  needs the box ticked.
+- New third tab **Limits**: Loops, Minutes, Coverage % (the run stops by itself and counts as finished; empty or 0 means
+  until stopped) and Errors written (the engine's `maxLog`; empty means 200, 0 means all). Largest values: 1,000,000 loops,
+  10,000,000 minutes, 100 %, 1,000,000 errors. They are checked like the fields of point 5; the line under them names the
+  first wrong field, and since Start is on the Testing page the tab's caption changes to "Limits (error)". The third tab
+  instead of more rows on the Advanced tab keeps the window from growing too tall for small screens.
+- Not in the form (command line only) is listed in the "Done when" line above.
+- No settings are saved. The form shows the defaults at every start.
+- New layout kind `Caution` (wrapped text, up to three lines) for the warning and the Limits line.
 
 ## 7. Running the test: result, status and state machine
 
