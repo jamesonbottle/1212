@@ -143,19 +143,43 @@ needs two monitors: it stays on the manual checklist of point 14. What changed:
 **Problem.** Today input is clamped silently and parsed with `_wtoi`/`_wtoi64`.
 
 **Fix.**
-- [ ] Parse with `wcstoull`/`std::from_chars` into a checked result type: *empty*, *ok(value)*, *not a number*,
+- [x] Parse with `wcstoull`/`std::from_chars` into a checked result type: *empty*, *ok(value)*, *not a number*,
       *out of range*. No silent clamping.
-- [ ] On bad input: show a short message next to the field (an inline label, or a balloon tip via `EM_SHOWBALLOONTIP`),
+- [x] On bad input: show a short message next to the field (an inline label, or a balloon tip via `EM_SHOWBALLOONTIP`),
       keep the user's text, disable Start until valid. Say what the valid range is.
-- [ ] Megabytes: empty means automatic (as today) and the field then shows the value actually planned, with the source of
+- [x] Megabytes: empty means automatic (as today) and the field then shows the value actually planned, with the source of
       the limit ("90 % of free RAM"). Manual range 64 MB up to what `sizing::plan` allows.
-- [ ] Threads: 1 up to the number of logical CPUs the process may use (`plat::ncpu()`); a larger value is an error, not a
+- [x] Threads: 1 up to the number of logical CPUs the process may use (`plat::ncpu()`); a larger value is an error, not a
       silent change.
-- [ ] Use `ES_NUMBER` only as a help, not as validation (it still allows pasted text).
-- [ ] Keep the up/down controls (`UPDOWN_CLASSW`) with 32-bit ranges and acceleration.
-- [ ] The validation rules are a plain function in `gui_model.h` with unit tests in `tools/unit_tests.cpp`.
+- [x] Use `ES_NUMBER` only as a help, not as validation (it still allows pasted text).
+- [x] Keep the up/down controls (`UPDOWN_CLASSW`) with 32-bit ranges and acceleration.
+- [x] The validation rules are a plain function in `gui_model.h` with unit tests in `tools/unit_tests.cpp`.
 
 **Done when.** Typing `abc`, `0`, `-5`, a huge number, and a pasted `12 34` each give a clear message and never start a run.
+
+**Status: done.** Built and tested only by GitHub Actions (format, clang-tidy report, Linux build and unit tests,
+self-test with none, ASan+UBSan and TSan, and the Windows build with `/W4 /w44365 /WX`, which also links the GUI) and
+all of it passed on commit 794c391. The GUI has still not been run on a real machine, so the "done when" line is proven
+for the rules (unit tests, `test_gui_input`) but not yet by typing into the window; that stays on the manual checklist of
+point 14. What changed:
+- `gui_model.h`: `parse_number` takes digits only (no sign, no separator, no other script's digits; blanks at the ends are
+  ignored) and returns Empty, Ok, NotANumber or TooBig. `check_threads` and `check_megabytes` give Automatic, Valid,
+  NotANumber, TooSmall or TooLarge with the range. `validate_form` checks the whole form, and `settings_from_form` builds
+  the engine `Settings` from it. The old `threads_for_auto`, `threads_from_form` and `megabytes_from_form` clamps are gone.
+- Window: the text of a field is read whole (the old 31-character buffer cut a long paste silently, `_wtoi64` read
+  `12 34` as 12). Two status lines under the fields (inline labels, not balloon tips) say what is wrong and the valid range,
+  or for an automatic size where it comes from (90 % of free memory, free memory minus 512 MB, the page file, the 64 MB
+  floor). The user's text is never changed. Start is disabled while a field is invalid and is checked again in
+  `start_run`. Nothing is checked while a run is going (the fields are locked and the free memory is the run's own doing).
+- Ranges: Threads is 1 to the usable CPUs (before: 0 or text that was no number meant every CPU, and anything above 256 was cut to 256). Megabytes is 64 to what `sizing::plan`
+  allows for the free memory and commit limit right now, and never more than the machine's RAM (before: up to the total
+  RAM, then cut by the engine). The up-down ranges follow these, set once when the window is built: changing them later
+  could make the control rewrite what the user typed.
+- Kept as they were: empty Threads means every usable CPU; empty or cleared Megabytes is refilled with the automatic size;
+  `ES_NUMBER` stays as a typing help only.
+- Layout: two new rows in the Testing page, so the window is taller.
+- Free memory changes while the window is open, so a typed size that was valid can become too large (the line says so and
+  Start is disabled) until the user lowers it.
 
 ## 6. Settings sent to the engine
 
