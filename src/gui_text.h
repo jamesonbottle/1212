@@ -21,17 +21,25 @@ inline constexpr const wchar_t* kWindowFailed = L"The window could not be create
 inline constexpr const wchar_t* kCouldNotStartPrefix = L"The test could not start (";
 inline constexpr const wchar_t* kCouldNotStartSuffix = L").";
 inline constexpr const wchar_t* kCouldNotStartPlain = L"The test could not start.";
+inline constexpr const wchar_t* kUnlockedRefused =
+    L"The memory could not be locked into RAM, so the system may swap parts of it out and a clean result would prove "
+    L"little. Lower Megabytes, or tick \"Allow unlocked memory\" on the Advanced tab to run anyway.";
 
 // ---- tabs, groups and labels ----
 // An & in a caption marks its Alt+letter key (a label moves focus to the field after it). Each letter is used once
-// in the window: S (Start/Stop), M, R, B, E on the Testing page; C, G, T, F on the Advanced page; Q (Force quit).
+// in the window: S (Start/Stop), M, R, B, E on the Testing page; C, G, T, F, U on the Advanced page; P, N, V, W on the
+// Limits page; Q (Force quit).
 inline constexpr const wchar_t* kTabTesting = L"Testing";
 inline constexpr const wchar_t* kTabAdvanced = L"Advanced";
+inline constexpr const wchar_t* kTabLimits = L"Limits";
+inline constexpr const wchar_t* kTabLimitsError = L"Limits (error)"; // a field on that page needs fixing
 inline constexpr const wchar_t* kGroupSystem = L"System status";
 inline constexpr const wchar_t* kGroupSettings = L"Test settings";
 inline constexpr const wchar_t* kGroupStatus = L"Test status";
 inline constexpr const wchar_t* kGroupAdvanced = L"Advanced";
 inline constexpr const wchar_t* kGroupExperimental = L"Experimental";
+inline constexpr const wchar_t* kGroupMemory = L"Memory";
+inline constexpr const wchar_t* kGroupLimits = L"Stop by itself";
 inline constexpr const wchar_t* kLabelTotal = L"Total memory:";
 inline constexpr const wchar_t* kLabelFree = L"Free memory:";
 inline constexpr const wchar_t* kLabelMegabytes = L"&Megabytes:";
@@ -45,6 +53,13 @@ inline constexpr const wchar_t* kLabelSet = L"&Test set:";
 inline constexpr const wchar_t* kCheckBeep = L"&Beep on error";
 inline constexpr const wchar_t* kCheckStopOnError = L"Stop on &error";
 inline constexpr const wchar_t* kCheckFpu = L"Stress &FPU";
+inline constexpr const wchar_t* kCheckUnlocked = L"Allow &unlocked memory";
+inline constexpr const wchar_t* kUnlockedWarning =
+    L"Memory that can be swapped out makes a clean result prove little. Leave this off unless a run will not start.";
+inline constexpr const wchar_t* kLabelLoops = L"Loo&ps:";
+inline constexpr const wchar_t* kLabelMinutes = L"Mi&nutes:";
+inline constexpr const wchar_t* kLabelCoverage = L"Co&verage %:";
+inline constexpr const wchar_t* kLabelMaxLog = L"Errors &written:";
 inline constexpr const wchar_t* kAdvancedHelp =
     L"CPU cache: Default follows each test; Bypass reads straight from DRAM (clflush every access); Cached uses "
     L"normal write-back traffic; Non-temporal uses streaming stores.\n\n"
@@ -68,6 +83,12 @@ inline constexpr const wchar_t* kHintAutoPercent = L"Automatic: 90 % of free mem
 inline constexpr const wchar_t* kHintAutoFloor = L"Automatic: free memory minus 512 MB.";
 inline constexpr const wchar_t* kHintAutoCommit = L"Automatic: limited by the page file.";
 inline constexpr const wchar_t* kHintAutoMinimum = L"Automatic: the minimum, 64 MB.";
+inline constexpr const wchar_t* kNameLoops = L"Loops: ";
+inline constexpr const wchar_t* kNameMinutes = L"Minutes: ";
+inline constexpr const wchar_t* kNameCoverage = L"Coverage: ";
+inline constexpr const wchar_t* kNameMaxLog = L"Errors written: ";
+inline constexpr const wchar_t* kHintLimitsOk =
+    L"Empty or 0 means no limit. For Errors written, empty means 200 and 0 means all.";
 inline constexpr const wchar_t* kHintAutoThreadsPre = L"Automatic: ";
 inline constexpr const wchar_t* kHintAutoThreadsPost = L" (one per usable CPU).";
 

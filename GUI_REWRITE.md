@@ -188,11 +188,14 @@ point 14. What changed:
 - [ ] Add the missing options the engine has and the GUI does not: **"Allow running with unlocked memory"** (default off,
       with a warning text; today the GUI forces it on), **maximum errors logged** (`maxLog`), **loops/time limit** and
       **coverage target** (the engine already supports them).
-- [ ] Persist the form values between runs in `%LOCALAPPDATA%\ddr5ramtest\settings.ini` (plain text, written atomically,
-      read with validation; a corrupt file is ignored, never fatal).
-- [ ] Keep "Advanced" settings on a second tab; the defaults stay what they are today.
+- [ ] Keep "Advanced" settings on a second tab; the defaults stay what they are today. The limits (loops, minutes,
+      coverage target, errors written) go on a third tab, "Limits".
+- The GUI **does not save its settings**: nothing is written to disk to remember the form between runs, so every start
+  shows the defaults. (Decision: no settings file, no registry key. The log of point 10 is a separate matter.)
 
 **Done when.** Every engine option that makes sense for a GUI is either shown or deliberately listed as CLI-only.
+CLI-only: `-f` (test name filter), `--seed`, `--flush`, `--test-seconds`, `--log FILE` (the GUI has its own log, point
+10), `--no-large-pages` (the GUI always asks for them; point 7 shows whether it got them), `--list`, `--version`.
 
 ## 7. Running the test: result, status and state machine
 
@@ -306,7 +309,7 @@ order.
 
 - [ ] **Pure logic unit tests** in `tools/unit_tests.cpp` (it already runs on Linux too): input validation, form to
       `Settings`, the state machine and what each state shows, UTF-8/UTF-16 conversion (non-ASCII text, an invalid
-      sequence, an empty string), settings file read/write, log writer failures. These files contain no Win32 headers, so
+      sequence, an empty string), log writer failures. These files contain no Win32 headers, so
       they compile everywhere.
 - [ ] **Windows CI job** builds the GUI and runs the unit tests with `/WX`.
 - [ ] **Smoke test on the Windows runner:** start the GUI with a hidden command line switch (`--selftest`) that creates the

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <functional>
 #include <limits>
 #include <map>
@@ -2414,7 +2415,7 @@ static void test_gui_layout() {
     for (int i = 0; i < n; ++i) {
         const Control& c = t[i];
         if (i > 0) {
-            CHECK(c.page == 0 || c.page == 1, "control %d: page %d", i, c.page);
+            CHECK(c.page >= 0 && c.page < kPageCount, "control %d: page %d", i, c.page);
             const int key = c.page * 100000 + c.row * 100 + (c.kind == Kind::Group ? 0 : 1 + c.col);
             CHECK(key >= prevKey, "control %d is out of reading order (page %d row %d col %d)", i, c.page, c.row,
                   c.col);
@@ -2744,7 +2745,10 @@ static void test_gui_input() {
     Settings s = settings_from_form(f, sys);
     CHECK(s.threads == 3 && s.megabytes == 2048, "typed values: %d threads, %llu MB", s.threads,
           static_cast<unsigned long long>(s.megabytes));
-    CHECK(!s.stopOnError && s.stressFpu && s.largePages && s.allowUnlocked && s.loops == 0, "other settings");
+    CHECK(!s.stopOnError && s.stressFpu && s.largePages, "other settings");
+    CHECK(!s.allowUnlocked, "unlocked memory is off unless the box is ticked (it used to be forced on)");
+    CHECK(s.loops == 0 && s.minutes == 0 && s.coverageStop == 0 && s.maxLog == Settings().maxLog,
+          "empty limits: run until stopped, the engine's default for the errors written");
     CHECK(static_cast<int>(s.cacheMode) == 1 && static_cast<int>(s.rngMode) == 2 && static_cast<int>(s.suite) == 1,
           "list choices");
     f.megabytesText = L"";
@@ -2753,6 +2757,61 @@ static void test_gui_input() {
     CHECK(s.threads == 3 && s.megabytes == auto_megabytes(3, sys.availPhys, sys.availCommit),
           "automatic size for 3 threads");
     CHECK(s.megabytes % 6 == 0, "automatic size is whole pieces for 3 threads");
+    // the Limits page and the unlocked-memory box
+    f.allowUnlocked = true;
+    f.loopsText = L"5";
+    f.minutesText = L"90";
+    f.coverageText = L"100";
+    f.maxLogText = L"0";
+    s = settings_from_form(f, sys);
+    CHECK(s.allowUnlocked && s.loops == 5 && s.minutes == 90.0 && s.coverageStop == 100 && s.maxLog == 0,
+          "limits: loops %llu, minutes %.1f, coverage %llu, max log %llu", static_cast<unsigned long long>(s.loops),
+          s.minutes, static_cast<unsigned long long>(s.coverageStop), static_cast<unsigned long long>(s.maxLog));
+    c = validate_form(f, sys);
+    CHECK(c.ok() && c.limits_ok() && limits_hint(c) == kHintLimitsOk, "valid limits: the usual line");
+    struct L {
+        const wchar_t* loops;
+        const wchar_t* minutes;
+        const wchar_t* coverage;
+        const wchar_t* maxLog;
+        const wchar_t* named; // the line must start with this field's name; nullptr = all fine
+    };
+    const L limits[] = {
+        {L"", L"", L"", L"", nullptr},
+        {L"0", L"0", L"0", L"0", nullptr},
+        {L"1000000", L"10000000", L"100", L"1000000", nullptr},
+        {L"1000001", L"", L"", L"", kNameLoops},
+        {L"abc", L"", L"", L"", kNameLoops},
+        {L"", L"10000001", L"", L"", kNameMinutes},
+        {L"", L"-5", L"", L"", kNameMinutes},
+        {L"", L"", L"101", L"", kNameCoverage},
+        {L"", L"", L"12 34", L"", kNameCoverage},
+        {L"", L"", L"", L"1000001", kNameMaxLog},
+        {L"", L"", L"", L"99999999999999999999999", kNameMaxLog},
+        {L"x", L"y", L"z", L"w", kNameLoops}, // several wrong: the first one is named
+    };
+    for (const L& l : limits) {
+        FormValues g;
+        g.loopsText = l.loops;
+        g.minutesText = l.minutes;
+        g.coverageText = l.coverage;
+        g.maxLogText = l.maxLog;
+        const FormCheck gc = validate_form(g, sys);
+        CHECK(gc.limits_ok() == (l.named == nullptr), "limits \"%ls\" \"%ls\" \"%ls\" \"%ls\": ok %d", l.loops,
+              l.minutes, l.coverage, l.maxLog, gc.limits_ok());
+        CHECK(gc.ok() == gc.limits_ok(), "the Limits page alone decides here (the other fields are empty)");
+        const std::wstring h = limits_hint(gc);
+        if (l.named)
+            CHECK(h.rfind(l.named, 0) == 0 && h.size() > wcslen(l.named), "hint \"%ls\" must start with \"%ls\"",
+                  h.c_str(), l.named);
+        else
+            CHECK(h == kHintLimitsOk, "valid limits show the usual line");
+    }
+    CHECK(refused_for_unlocked_memory("fix the limit, lower -mb, or pass --allow-unlocked to run anyway\n"),
+          "the engine's refusal for unlocked memory is recognised");
+    CHECK(!refused_for_unlocked_memory("allocation of 4096 MB failed\n") && !refused_for_unlocked_memory(""),
+          "other start failures are not taken for it");
+
     f.threadsText = L"abc"; // never started like this; it must not give nonsense
     s = settings_from_form(f, sys);
     CHECK(s.threads == cpus && s.megabytes >= 64, "an invalid field counts as automatic");

@@ -132,7 +132,9 @@ struct MainWindow::Impl {
     HWND hTotal = nullptr, hFree = nullptr, hMB = nullptr, hMBud = nullptr, hThr = nullptr, hThrUd = nullptr,
          hBeep = nullptr, hStopErr = nullptr, hDur = nullptr, hCov = nullptr, hErr = nullptr, hTest = nullptr,
          hStart = nullptr, hCache = nullptr, hRng = nullptr, hSet = nullptr, hFpu = nullptr, hMbHint = nullptr,
-         hThrHint = nullptr;
+         hThrHint = nullptr, hUnlocked = nullptr, hLoops = nullptr, hMinutes = nullptr, hCover = nullptr,
+         hMaxLog = nullptr, hLimitHint = nullptr;
+    bool limitsFlagged = false; // the Limits tab shows that a field on it needs fixing
     std::vector<HWND> lockWhileRunning;
     GuiRun run;
     double endT = 0;
@@ -274,6 +276,7 @@ struct MainWindow::Impl {
             style |= BS_DEFPUSHBUTTON | WS_TABSTOP | WS_GROUP; // Enter presses it (DM_GETDEFID below)
             break;
         case Kind::Note:
+        case Kind::Caution:
             style |= SS_LEFT | SS_NOPREFIX;
             break;
         }
@@ -390,6 +393,11 @@ struct MainWindow::Impl {
         f.rngIndex = selected_index(hRng);
         f.suiteIndex = selected_index(hSet);
         f.stressFpu = is_checked(hFpu);
+        f.allowUnlocked = is_checked(hUnlocked);
+        f.loopsText = read_text(hLoops);
+        f.minutesText = read_text(hMinutes);
+        f.coverageText = read_text(hCover);
+        f.maxLogText = read_text(hMaxLog);
         return f;
     }
 
@@ -412,7 +420,37 @@ struct MainWindow::Impl {
         const FormCheck c = validate_form(read_form(), sys);
         set_text(hMbHint, megabytes_hint(c));
         set_text(hThrHint, threads_hint(c));
+        set_text(hLimitHint, limits_hint(c));
+        flag_limits_tab(!c.limits_ok());
         EnableWindow(hStart, c.ok() ? TRUE : FALSE);
+    }
+
+    // Start is on the Testing page, so a wrong field on the Limits page is also shown on the tab's caption.
+    void flag_limits_tab(bool bad) {
+        if (bad == limitsFlagged)
+            return;
+        limitsFlagged = bad;
+        TCITEMW ti{};
+        ti.mask = TCIF_TEXT;
+        ti.pszText = const_cast<LPWSTR>(bad ? kTabLimitsError : kTabLimits);
+        TabCtrl_SetItem(tab, 2, &ti);
+    }
+
+    // The control of the first field that is wrong, and the page it is on.
+    HWND first_invalid(const FormCheck& c, int& page) const {
+        page = 0;
+        if (!c.megabytes.ok())
+            return hMB;
+        if (!c.threads.ok())
+            return hThr;
+        page = 2;
+        if (!c.loops.ok())
+            return hLoops;
+        if (!c.minutes.ok())
+            return hMinutes;
+        if (!c.coverage.ok())
+            return hCover;
+        return hMaxLog;
     }
 
     void refresh() {
@@ -466,7 +504,12 @@ struct MainWindow::Impl {
         const FormCheck check = validate_form(form, sys);
         if (!check.ok()) { // Start is disabled then; this is the way in that is left (a stale click, a key)
             update_inputs();
-            HWND bad = check.megabytes.ok() ? hThr : hMB;
+            int page = 0;
+            HWND bad = first_invalid(check, page);
+            if (TabCtrl_GetCurSel(tab) != page) {
+                TabCtrl_SetCurSel(tab, page);
+                show_page(page);
+            }
             SetFocus(bad);
             SendMessageW(bad, EM_SETSEL, 0, -1);
             return;
@@ -542,7 +585,9 @@ struct MainWindow::Impl {
             if (closing)
                 return; // the user is closing the window: no box in the way
             std::wstring msg = utf8_to_wide(last);
-            if (msg.empty())
+            if (refused_for_unlocked_memory(last))
+                msg = kUnlockedRefused; // the engine's last line names a command line option
+            else if (msg.empty())
                 msg = kCouldNotStartPlain;
             MessageBoxW(wnd, msg.c_str(), kAppTitle, MB_OK | MB_ICONWARNING);
         }
@@ -574,6 +619,9 @@ struct MainWindow::Impl {
         ti.pszText = const_cast<LPWSTR>(kTabAdvanced);
         if (TabCtrl_InsertItem(tab, 1, &ti) < 0)
             return false;
+        ti.pszText = const_cast<LPWSTR>(kTabLimits);
+        if (TabCtrl_InsertItem(tab, 2, &ti) < 0)
+            return false;
         measure_tab_strip();
 
         hTotal = item(ID_TOTAL);
@@ -595,6 +643,12 @@ struct MainWindow::Impl {
         hFpu = item(ID_FPU);
         hMbHint = item(ID_MBHINT);
         hThrHint = item(ID_THRHINT);
+        hUnlocked = item(ID_UNLOCKED);
+        hLoops = item(ID_LOOPS);
+        hMinutes = item(ID_MINUTES);
+        hCover = item(ID_COVER);
+        hMaxLog = item(ID_MAXLOG);
+        hLimitHint = item(ID_LIMITHINT);
 
         SendMessageW(hBeep, BM_SETCHECK, BST_CHECKED, 0);
         SendMessageW(hStopErr, BM_SETCHECK, BST_CHECKED, 0);
@@ -623,7 +677,8 @@ struct MainWindow::Impl {
         SendMessageW(hThrUd, UDM_SETRANGE32, 1, sys.cpus);
         SendMessageW(hThrUd, UDM_SETPOS32, 0, sys.cpus);
 
-        lockWhileRunning = {hMB, hMBud, hThr, hThrUd, hStopErr, hCache, hRng, hSet, hFpu};
+        lockWhileRunning = {hMB,  hMBud, hThr,      hThrUd, hStopErr, hCache, hRng,
+                            hSet, hFpu,  hUnlocked, hLoops, hMinutes, hCover, hMaxLog};
         if (!fit_window())
             return false;
         built = true;
@@ -698,7 +753,9 @@ struct MainWindow::Impl {
                 else if (LOWORD(wp) == ID_THR && mbAuto)
                     apply_auto_mb(); // thread count changed: refill memory automatically
             }
-            if (HIWORD(wp) == EN_CHANGE && (LOWORD(wp) == ID_MB || LOWORD(wp) == ID_THR))
+            if (HIWORD(wp) == EN_CHANGE &&
+                (LOWORD(wp) == ID_MB || LOWORD(wp) == ID_THR || LOWORD(wp) == ID_LOOPS || LOWORD(wp) == ID_MINUTES ||
+                 LOWORD(wp) == ID_COVER || LOWORD(wp) == ID_MAXLOG))
                 update_inputs(); // also for a change the program made: the lines under the fields follow the text
             if (LOWORD(wp) == ID_START && HIWORD(wp) == BN_CLICKED) {
                 if (run.busy())

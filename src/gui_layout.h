@@ -38,8 +38,14 @@ enum ControlId : int {
     ID_RNG,
     ID_SET,
     ID_FPU,
-    ID_MBHINT, // the line under the Megabytes field
-    ID_THRHINT // the line under the Threads field
+    ID_MBHINT,  // the line under the Megabytes field
+    ID_THRHINT, // the line under the Threads field
+    ID_UNLOCKED,
+    ID_LOOPS,
+    ID_MINUTES,
+    ID_COVER,
+    ID_MAXLOG,
+    ID_LIMITHINT // the lines under the four fields of the Limits page
 };
 
 namespace layout {
@@ -55,14 +61,15 @@ enum class Kind {
     Check,  // check box over both columns
     Combo,  // drop-down list
     Button, // the Start button, over both columns
-    Note    // wrapped paragraph over both columns
+    Note,   // wrapped paragraph over both columns
+    Caution // wrapped text of up to three lines over both columns (a warning, or a message under fields)
 };
 
 struct Control {
     int id;
     Kind kind;
     const wchar_t* text; // caption; nullptr or L"" when there is none
-    int page;            // -1: always visible (the tab strip), 0 or 1: page of the tab strip
+    int page;            // -1: always visible (the tab strip), else the page of the tab strip (0, 1, 2)
     int row;             // row within the page; a Group names the first row inside it
     int col;             // 0 = label column, 1 = field column
     int colSpan;         // 1 or 2 (2: over both columns)
@@ -102,6 +109,9 @@ constexpr Control button(int page, int row, int id, const wchar_t* text) {
 }
 constexpr Control note(int page, int row, const wchar_t* text) {
     return {0, Kind::Note, text, page, row, 0, 2, 1, 0};
+}
+constexpr Control caution(int page, int row, int id, const wchar_t* text) {
+    return {id, Kind::Caution, text, page, row, 0, 2, 1, 0};
 }
 
 // The table. A label comes right before the field it names (the mnemonic of the label moves to the next tab stop, and
@@ -144,10 +154,24 @@ inline constexpr Control kControls[] = {
     combo(1, 2, ID_SET),
     group(1, 3, 1, kGroupExperimental),
     check(1, 3, ID_FPU, kCheckFpu),
-    note(1, 4, kAdvancedHelp),
+    group(1, 4, 2, kGroupMemory),
+    check(1, 4, ID_UNLOCKED, kCheckUnlocked),
+    caution(1, 5, 0, kUnlockedWarning),
+    note(1, 6, kAdvancedHelp),
+    // Limits page
+    group(2, 0, 5, kGroupLimits),
+    label(2, 0, kLabelLoops),
+    edit(2, 0, ID_LOOPS),
+    label(2, 1, kLabelMinutes),
+    edit(2, 1, ID_MINUTES),
+    label(2, 2, kLabelCoverage),
+    edit(2, 2, ID_COVER),
+    label(2, 3, kLabelMaxLog),
+    edit(2, 3, ID_MAXLOG),
+    caution(2, 4, ID_LIMITHINT, L""),
 };
 inline constexpr std::size_t kControlCount = sizeof kControls / sizeof kControls[0];
-inline constexpr int kPageCount = 2;
+inline constexpr int kPageCount = 3;
 
 // ---- what the layout needs to know about the window ----
 
@@ -199,6 +223,8 @@ inline int cell_dlu(Kind k) {
         return 10;
     case Kind::Button:
         return 22;
+    case Kind::Caution:
+        return 24;
     case Kind::Note:
         return 80;
     case Kind::Tab:

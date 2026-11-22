@@ -37,6 +37,12 @@ struct FormValues {
     int rngIndex = 0;
     int suiteIndex = 0;
     bool stressFpu = false;
+    bool allowUnlocked = false; // run even when the memory could not be locked into RAM (default: refuse)
+    // The Limits page. Empty = no limit (for maxLogText: the engine's default).
+    std::wstring loopsText;
+    std::wstring minutesText;
+    std::wstring coverageText;
+    std::wstring maxLogText;
 };
 
 // What a finished run tells the status line.
@@ -51,6 +57,13 @@ inline constexpr u64 kMinMegabytes = 64; // the least a typed size may be, and t
 // The strings in gui_text.h name these numbers; this keeps the two from drifting apart.
 static_assert(sizing::kAutoPercent == 90 && sizing::kAutoFloor == 512 * sizing::kMB && kMinMegabytes == 64,
               "the texts of the Megabytes hints (gui_text.h) name these numbers");
+
+// The largest value a Limits field takes (the engine would take more; these are sane limits for a GUI). 0 and empty
+// mean "no limit" in all of them except Errors written, where empty is the engine's default and 0 is "all".
+inline constexpr u64 kMaxLoops = 1000000;
+inline constexpr u64 kMaxMinutes = 10000000; // the same as the command line's limit
+inline constexpr u64 kMaxCoverage = 100;     // percent
+inline constexpr u64 kMaxErrorsWritten = 1000000;
 
 // ~90% of free RAM (sizing.h), rounded down to a multiple of two pieces per thread, at least 64 MB.
 inline u64 auto_megabytes(int threads, u64 availPhys, u64 availCommit) {
@@ -197,25 +210,45 @@ inline FieldCheck check_megabytes(std::wstring_view text, bool autoFilled, const
     return c;
 }
 
-// The whole form checked. runThreads and runMegabytes are what a run would use; a field that is not ok counts as
-// Automatic there, but a run must not start then (the window keeps Start disabled).
+// The whole form checked. The run* values are what a run would use; a field that is not ok counts as empty there, but
+// a run must not start then (the window keeps Start disabled).
 struct FormCheck {
     FieldCheck megabytes;
     FieldCheck threads;
+    FieldCheck loops;
+    FieldCheck minutes;
+    FieldCheck coverage;
+    FieldCheck maxLog;
     int runThreads = 1;
     u64 runMegabytes = kMinMegabytes;
+    u64 runLoops = 0;
+    u64 runMinutes = 0;
+    u64 runCoverage = 0;
+    u64 runMaxLog = 0;
     AutoSource autoSource = AutoSource::Minimum;
-    bool ok() const { return megabytes.ok() && threads.ok(); }
+    bool limits_ok() const { return loops.ok() && minutes.ok() && coverage.ok() && maxLog.ok(); }
+    bool ok() const { return megabytes.ok() && threads.ok() && limits_ok(); }
 };
 
 inline FormCheck validate_form(const FormValues& f, const SystemInfo& sys) {
     FormCheck c;
     c.threads = check_threads(f.threadsText, sys.cpus);
     c.megabytes = check_megabytes(f.megabytesText, f.megabytesAuto, sys);
+    c.loops = check_range(f.loopsText, 0, kMaxLoops);
+    c.minutes = check_range(f.minutesText, 0, kMaxMinutes);
+    c.coverage = check_range(f.coverageText, 0, kMaxCoverage);
+    c.maxLog = check_range(f.maxLogText, 0, kMaxErrorsWritten);
     c.runThreads = c.threads.state == FieldState::Valid ? static_cast<int>(c.threads.value) : std::max(1, sys.cpus);
     c.runMegabytes = c.megabytes.state == FieldState::Valid
                          ? c.megabytes.value
                          : auto_megabytes(c.runThreads, sys.availPhys, sys.availCommit);
+    const auto typed = [](const FieldCheck& fc, u64 empty) {
+        return fc.state == FieldState::Valid ? fc.value : empty;
+    };
+    c.runLoops = typed(c.loops, 0);
+    c.runMinutes = typed(c.minutes, 0);
+    c.runCoverage = typed(c.coverage, 0);
+    c.runMaxLog = typed(c.maxLog, Settings().maxLog); // empty: the engine's default
     c.autoSource = auto_megabytes_source(c.runThreads, sys);
     return c;
 }
@@ -259,9 +292,29 @@ inline std::wstring threads_hint(const FormCheck& c) {
     return range_hint(c.threads, kHintEnd);
 }
 
+// The two lines under the Limits fields: the first field that is wrong (named, because the lines are shared), or how
+// the empty fields are read.
+inline std::wstring limits_hint(const FormCheck& c) {
+    if (!c.loops.ok())
+        return kNameLoops + range_hint(c.loops, kHintEnd);
+    if (!c.minutes.ok())
+        return kNameMinutes + range_hint(c.minutes, kHintEnd);
+    if (!c.coverage.ok())
+        return kNameCoverage + range_hint(c.coverage, kHintEnd);
+    if (!c.maxLog.ok())
+        return kNameMaxLog + range_hint(c.maxLog, kHintEnd);
+    return kHintLimitsOk;
+}
+
+// The engine refused to start because the memory could not be locked (its last line names the command line option
+// that overrides it). The GUI words that for its own check box.
+inline bool refused_for_unlocked_memory(const std::string& lastEngineLine) {
+    return lastEngineLine.find("--allow-unlocked") != std::string::npos;
+}
+
 // The engine settings for the form. The caller starts a run only when validate_form(f, sys).ok(); a field that is not
-// ok counts as automatic here. The GUI keeps its old behaviour for the options it has no control for yet: large pages
-// on, unlocked memory allowed, run until stopped (see FIXES.md #1 and #11).
+// ok counts as empty here. Not in the form (command line only): the flush mode, the seed, the test filter, the seconds
+// per test and the log file name. Large pages are always asked for.
 inline Settings settings_from_form(const FormValues& f, const SystemInfo& sys) {
     const FormCheck c = validate_form(f, sys);
     Settings s;
@@ -273,8 +326,11 @@ inline Settings settings_from_form(const FormValues& f, const SystemInfo& sys) {
     s.suite = static_cast<SuiteSet>(std::max(0, f.suiteIndex));
     s.stressFpu = f.stressFpu;
     s.largePages = true;
-    s.allowUnlocked = true;
-    s.loops = 0;
+    s.allowUnlocked = f.allowUnlocked;
+    s.loops = c.runLoops;
+    s.minutes = static_cast<double>(c.runMinutes);
+    s.coverageStop = c.runCoverage;
+    s.maxLog = c.runMaxLog;
     return s;
 }
 
