@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <thread>
@@ -24,6 +25,7 @@
 #include "gen.h"
 #include "gui_dpi.h"
 #include "gui_layout.h"
+#include "gui_model.h"
 #include "log.h"
 #include "order.h"
 #include "params.h"
@@ -2540,6 +2542,222 @@ static void test_gui_layout() {
     }
 }
 
+// Input checking of the GUI's number fields (gui_model.h): parsing, ranges, the lines under the fields, and the
+// settings built from a checked form. Pure logic, so it runs on every platform.
+static void test_gui_input() {
+    using namespace ddr5::gui;
+
+    // parse_number: digits only, blanks at the ends are ignored, nothing is clamped or guessed
+    struct P {
+        const wchar_t* text;
+        NumberKind kind;
+        u64 value;
+    };
+    const P cases[] = {
+        {L"", NumberKind::Empty, 0},
+        {L"   ", NumberKind::Empty, 0},
+        {L"\t\r\n", NumberKind::Empty, 0},
+        {L"0", NumberKind::Ok, 0},
+        {L"007", NumberKind::Ok, 7},
+        {L"12", NumberKind::Ok, 12},
+        {L" 12 ", NumberKind::Ok, 12},
+        {L"18446744073709551615", NumberKind::Ok, std::numeric_limits<u64>::max()},
+        {L"18446744073709551616", NumberKind::TooBig, std::numeric_limits<u64>::max()},
+        {L"99999999999999999999999999999999999999", NumberKind::TooBig, std::numeric_limits<u64>::max()},
+        {L"abc", NumberKind::NotANumber, 0},
+        {L"-5", NumberKind::NotANumber, 0},
+        {L"+5", NumberKind::NotANumber, 0},
+        {L"12 34", NumberKind::NotANumber, 0},
+        {L"12\t34", NumberKind::NotANumber, 0},
+        {L"1,000", NumberKind::NotANumber, 0},
+        {L"1.5", NumberKind::NotANumber, 0},
+        {L"1e3", NumberKind::NotANumber, 0},
+        {L"0x10", NumberKind::NotANumber, 0},
+        {L"12a", NumberKind::NotANumber, 0},
+        {L"\xFF11\xFF12", NumberKind::NotANumber, 0}, // full-width digits are not digits here
+        {L"\x0661", NumberKind::NotANumber, 0},       // Arabic-Indic digit
+    };
+    for (const P& c : cases) {
+        const ParsedNumber r = parse_number(c.text);
+        CHECK(r.kind == c.kind && r.value == c.value, "parse_number(\"%ls\"): kind %d value %llu", c.text,
+              static_cast<int>(r.kind), static_cast<unsigned long long>(r.value));
+    }
+    // a very long paste is judged like any other text, whole
+    CHECK(parse_number(std::wstring(100000, L'7')).kind == NumberKind::TooBig, "100000 digits are too big");
+    CHECK(parse_number(std::wstring(100000, L'x')).kind == NumberKind::NotANumber, "100000 letters are no number");
+
+    // Threads: 1 .. cpus, empty = every CPU, no silent change
+    const int cpus = 8;
+    struct T {
+        const wchar_t* text;
+        FieldState state;
+        u64 value;
+    };
+    const T thr[] = {
+        {L"", FieldState::Automatic, 0},
+        {L"  ", FieldState::Automatic, 0},
+        {L"1", FieldState::Valid, 1},
+        {L"8", FieldState::Valid, 8},
+        {L"08", FieldState::Valid, 8},
+        {L"0", FieldState::TooSmall, 0},
+        {L"9", FieldState::TooLarge, 9},
+        {L"256", FieldState::TooLarge, 256},
+        {L"99999999999999999999999", FieldState::TooLarge, 0},
+        {L"abc", FieldState::NotANumber, 0},
+        {L"-5", FieldState::NotANumber, 0},
+        {L"12 34", FieldState::NotANumber, 0},
+    };
+    for (const T& c : thr) {
+        const FieldCheck r = check_threads(c.text, cpus);
+        CHECK(r.state == c.state && r.value == c.value && r.min == 1 && r.max == 8,
+              "check_threads(\"%ls\"): state %d value %llu range %llu..%llu", c.text, static_cast<int>(r.state),
+              static_cast<unsigned long long>(r.value), static_cast<unsigned long long>(r.min),
+              static_cast<unsigned long long>(r.max));
+        CHECK(r.ok() == (c.state == FieldState::Automatic || c.state == FieldState::Valid), "ok() of \"%ls\"", c.text);
+    }
+    CHECK(check_threads(L"1", 1).state == FieldState::Valid && check_threads(L"2", 1).state == FieldState::TooLarge,
+          "one CPU: 1 is the only thread count");
+    CHECK(check_threads(L"1", 0).state == FieldState::Valid, "a failed CPU count still allows one thread");
+
+    // Megabytes: 64 .. what sizing::plan allows (and not more than the machine has)
+    SystemInfo sys;
+    sys.cpus = cpus;
+    sys.totalMB = 16384;
+    sys.availPhys = 8ull << 30;
+    sys.availCommit = 20ull << 30;
+    const u64 planMB = sizing::plan(std::numeric_limits<u64>::max(), sys.availPhys, sys.availCommit).bytes >> 20;
+    const u64 maxMB = max_manual_megabytes(sys);
+    CHECK(maxMB == planMB && maxMB >= 64 && maxMB < sys.totalMB, "manual maximum %llu, plan allows %llu",
+          static_cast<unsigned long long>(maxMB), static_cast<unsigned long long>(planMB));
+    const std::wstring atMax = std::to_wstring(maxMB), overMax = std::to_wstring(maxMB + 1);
+    CHECK(check_megabytes(L"64", false, sys).state == FieldState::Valid, "64 MB is the least");
+    CHECK(check_megabytes(L"63", false, sys).state == FieldState::TooSmall, "63 MB is too small");
+    CHECK(check_megabytes(L"0", false, sys).state == FieldState::TooSmall, "0 MB is too small");
+    CHECK(check_megabytes(atMax, false, sys).state == FieldState::Valid, "the maximum itself is valid");
+    CHECK(check_megabytes(overMax, false, sys).state == FieldState::TooLarge, "one more than the maximum");
+    CHECK(check_megabytes(L"99999999999999999999999", false, sys).state == FieldState::TooLarge, "a huge number");
+    CHECK(check_megabytes(L"abc", false, sys).state == FieldState::NotANumber, "letters");
+    CHECK(check_megabytes(L"-5", false, sys).state == FieldState::NotANumber, "a minus sign");
+    CHECK(check_megabytes(L"12 34", false, sys).state == FieldState::NotANumber, "a pasted \"12 34\"");
+    CHECK(check_megabytes(L"", false, sys).state == FieldState::Automatic, "empty is automatic");
+    CHECK(check_megabytes(L"abc", true, sys).state == FieldState::Automatic, "program-filled text is not input");
+    CHECK(check_megabytes(L"4096", false, sys).value == 4096, "a valid size keeps its value");
+    {
+        SystemInfo noFree = sys; // the free-memory query failed: only the machine's total limits
+        noFree.availPhys = noFree.availCommit = 0;
+        CHECK(max_manual_megabytes(noFree) == sys.totalMB, "without free-memory numbers the total is the limit");
+        noFree.totalMB = 0;
+        CHECK(max_manual_megabytes(noFree) == kMinMegabytes, "without any numbers the range is just the minimum");
+    }
+
+    // the whole form: one bad field blocks, the other still reports
+    FormValues f;
+    f.threadsText = L"4";
+    f.megabytesText = L"1024";
+    f.megabytesAuto = false;
+    FormCheck c = validate_form(f, sys);
+    CHECK(c.ok() && c.runThreads == 4 && c.runMegabytes == 1024, "valid form: %d threads, %llu MB", c.runThreads,
+          static_cast<unsigned long long>(c.runMegabytes));
+    f.threadsText = L"abc";
+    c = validate_form(f, sys);
+    CHECK(!c.ok() && c.megabytes.ok() && !c.threads.ok(), "bad threads block Start, megabytes are still fine");
+    f.threadsText = L"4";
+    f.megabytesText = L"12 34";
+    c = validate_form(f, sys);
+    CHECK(!c.ok() && !c.megabytes.ok() && c.threads.ok(), "bad megabytes block Start, threads are still fine");
+    f.threadsText = L"0";
+    c = validate_form(f, sys);
+    CHECK(!c.megabytes.ok() && !c.threads.ok(), "both fields can be bad at once");
+
+    // automatic: empty threads = every CPU; the size follows the thread count and says where it comes from
+    f = FormValues();
+    f.threadsText = L"";
+    f.megabytesText = L"";
+    c = validate_form(f, sys);
+    CHECK(c.ok() && c.runThreads == cpus, "empty threads run every CPU");
+    CHECK(c.runMegabytes == auto_megabytes(cpus, sys.availPhys, sys.availCommit), "automatic size");
+    CHECK(c.autoSource == AutoSource::PercentOfFree, "8 GB free: 90 %% of it is the limit");
+    {
+        SystemInfo lowFree = sys;
+        lowFree.availPhys = 2ull << 30; // 90 % of 2 GB is more than 2 GB minus 512 MB
+        CHECK(auto_megabytes_source(cpus, lowFree) == AutoSource::FreeMinusFloor, "little free memory: minus 512 MB");
+        SystemInfo lowCommit = sys;
+        lowCommit.availCommit = 1ull << 30;
+        CHECK(auto_megabytes_source(cpus, lowCommit) == AutoSource::CommitLimit, "commit limit is the smaller one");
+        SystemInfo none = sys;
+        none.availPhys = none.availCommit = 0;
+        CHECK(auto_megabytes_source(cpus, none) == AutoSource::Minimum, "nothing free: the 64 MB floor");
+        CHECK(auto_megabytes(cpus, 0, 0) == kMinMegabytes, "automatic size never below 64 MB");
+    }
+
+    // the lines under the fields: what is wrong, and the range that is valid
+    const auto has = [](const std::wstring& hay, const std::wstring& needle) {
+        return hay.find(needle) != std::wstring::npos;
+    };
+    f.threadsText = L"9";
+    f.megabytesText = overMax;
+    f.megabytesAuto = false;
+    c = validate_form(f, sys);
+    CHECK(has(threads_hint(c), L"Too large") && has(threads_hint(c), L"8"), "threads over the CPUs: say the most");
+    CHECK(has(megabytes_hint(c), L"Too large") && has(megabytes_hint(c), atMax),
+          "megabytes over the plan: say the most");
+    f.threadsText = L"0";
+    f.megabytesText = L"1";
+    c = validate_form(f, sys);
+    CHECK(has(threads_hint(c), L"Too small") && has(threads_hint(c), L"1"), "0 threads: say the least");
+    CHECK(has(megabytes_hint(c), L"Too small") && has(megabytes_hint(c), L"64"), "1 MB: say the least");
+    f.threadsText = L"abc";
+    f.megabytesText = L"-5";
+    c = validate_form(f, sys);
+    CHECK(has(threads_hint(c), L"Whole number") && has(threads_hint(c), L"1 to 8"), "letters: say the range");
+    CHECK(has(megabytes_hint(c), L"Whole number") && has(megabytes_hint(c), L"64 to " + atMax),
+          "a minus sign: say the range");
+    f.threadsText = L"4";
+    f.megabytesText = L"1024";
+    c = validate_form(f, sys);
+    CHECK(has(threads_hint(c), L"1 to 8") && has(megabytes_hint(c), L"64 to " + atMax), "valid: the range is shown");
+    f.threadsText = L"";
+    f.megabytesText = L"";
+    f.megabytesAuto = true;
+    c = validate_form(f, sys);
+    CHECK(has(threads_hint(c), L"Automatic") && has(threads_hint(c), L"8"), "empty threads: automatic, how many");
+    CHECK(has(megabytes_hint(c), L"Automatic") && has(megabytes_hint(c), L"90 %"), "automatic size names its source");
+    for (const FieldState st : {FieldState::NotANumber, FieldState::TooSmall, FieldState::TooLarge}) {
+        FieldCheck fc;
+        fc.state = st;
+        fc.min = 1;
+        fc.max = 9;
+        CHECK(!range_hint(fc, kHintEnd).empty() && !fc.ok(), "state %d has a message and is not ok",
+              static_cast<int>(st));
+    }
+
+    // settings from a checked form: typed values go through unchanged, the GUI's fixed options stay as they were
+    f = FormValues();
+    f.threadsText = L"3";
+    f.megabytesText = L"2048";
+    f.megabytesAuto = false;
+    f.stopOnError = false;
+    f.cacheIndex = 1;
+    f.rngIndex = 2;
+    f.suiteIndex = 1;
+    f.stressFpu = true;
+    Settings s = settings_from_form(f, sys);
+    CHECK(s.threads == 3 && s.megabytes == 2048, "typed values: %d threads, %llu MB", s.threads,
+          static_cast<unsigned long long>(s.megabytes));
+    CHECK(!s.stopOnError && s.stressFpu && s.largePages && s.allowUnlocked && s.loops == 0, "other settings");
+    CHECK(static_cast<int>(s.cacheMode) == 1 && static_cast<int>(s.rngMode) == 2 && static_cast<int>(s.suite) == 1,
+          "list choices");
+    f.megabytesText = L"";
+    f.megabytesAuto = true;
+    s = settings_from_form(f, sys);
+    CHECK(s.threads == 3 && s.megabytes == auto_megabytes(3, sys.availPhys, sys.availCommit),
+          "automatic size for 3 threads");
+    CHECK(s.megabytes % 6 == 0, "automatic size is whole pieces for 3 threads");
+    f.threadsText = L"abc"; // never started like this; it must not give nonsense
+    s = settings_from_form(f, sys);
+    CHECK(s.threads == cpus && s.megabytes >= 64, "an invalid field counts as automatic");
+}
+
 // DPI arithmetic of the GUI (per-monitor v2): scaling to the window's DPI and making a reported DPI usable.
 static void test_gui_dpi() {
     using namespace ddr5::gui;
@@ -2599,6 +2817,7 @@ int main() {
     test_stop_gate();
     test_gui_layout();
     test_gui_dpi();
+    test_gui_input();
     test_keep_awake();
     test_cpu_set();
     test_coverage_map();

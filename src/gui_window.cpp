@@ -74,10 +74,15 @@ SystemInfo query_system() {
     return s;
 }
 
-long long read_number(HWND edit) {
-    wchar_t b[32] = {};
-    GetWindowTextW(edit, b, 32);
-    return _wtoi64(b);
+// The whole text of a field, however long (a pasted text is not cut: it is judged as it is).
+std::wstring read_text(HWND edit) {
+    const int n = GetWindowTextLengthW(edit);
+    if (n <= 0)
+        return std::wstring();
+    std::wstring s(static_cast<size_t>(n) + 1, L'\0');
+    const int got = GetWindowTextW(edit, s.data(), n + 1);
+    s.resize(got > 0 ? static_cast<size_t>(got) : 0);
+    return s;
 }
 bool is_checked(HWND box) {
     return SendMessageW(box, BM_GETCHECK, 0, 0) == BST_CHECKED;
@@ -126,7 +131,8 @@ struct MainWindow::Impl {
     std::vector<HWND> pages[layout::kPageCount];
     HWND hTotal = nullptr, hFree = nullptr, hMB = nullptr, hMBud = nullptr, hThr = nullptr, hThrUd = nullptr,
          hBeep = nullptr, hStopErr = nullptr, hDur = nullptr, hCov = nullptr, hErr = nullptr, hTest = nullptr,
-         hStart = nullptr, hCache = nullptr, hRng = nullptr, hSet = nullptr, hFpu = nullptr;
+         hStart = nullptr, hCache = nullptr, hRng = nullptr, hSet = nullptr, hFpu = nullptr, hMbHint = nullptr,
+         hThrHint = nullptr;
     std::vector<HWND> lockWhileRunning;
     GuiRun run;
     double endT = 0;
@@ -376,8 +382,8 @@ struct MainWindow::Impl {
 
     FormValues read_form() const {
         FormValues f;
-        f.threadsText = read_number(hThr);
-        f.megabytesText = read_number(hMB);
+        f.threadsText = read_text(hThr);
+        f.megabytesText = read_text(hMB);
         f.megabytesAuto = mbAuto;
         f.stopOnError = is_checked(hStopErr);
         f.cacheIndex = selected_index(hCache);
@@ -390,10 +396,23 @@ struct MainWindow::Impl {
     // Fills the Megabytes field with the automatic size for the thread count in the Threads field.
     void apply_auto_mb() {
         const SystemInfo sys = query_system();
-        const int threads = threads_for_auto(read_number(hThr), sys.cpus);
+        const FormCheck c = validate_form(read_form(), sys); // runThreads: the typed count, or every CPU
         setting = true;
-        SetWindowTextW(hMB, std::to_wstring(auto_megabytes(threads, sys.availPhys, sys.availCommit)).c_str());
+        SetWindowTextW(hMB, std::to_wstring(auto_megabytes(c.runThreads, sys.availPhys, sys.availCommit)).c_str());
         setting = false;
+    }
+
+    // The two lines under the number fields, and Start: it is enabled only while both fields are valid. Nothing is
+    // changed in the fields themselves. While a run is going the fields are locked and the free memory is the run's own
+    // doing, so nothing is checked then.
+    void update_inputs() {
+        if (!built || run.busy())
+            return;
+        const SystemInfo sys = query_system();
+        const FormCheck c = validate_form(read_form(), sys);
+        set_text(hMbHint, megabytes_hint(c));
+        set_text(hThrHint, threads_hint(c));
+        EnableWindow(hStart, c.ok() ? TRUE : FALSE);
     }
 
     void refresh() {
@@ -401,6 +420,7 @@ struct MainWindow::Impl {
         totalMB = sys.totalMB;
         set_text(hTotal, std::to_wstring(sys.totalMB) + L" MB");
         set_text(hFree, std::to_wstring(sys.availPhys >> 20) + L" MB");
+        update_inputs();
         if (!run.has_run())
             return;
         const bool busy = run.busy();
@@ -441,7 +461,17 @@ struct MainWindow::Impl {
     void start_run() {
         if (run.busy())
             return;
-        const Settings s = settings_from_form(read_form(), query_system());
+        const SystemInfo sys = query_system();
+        const FormValues form = read_form();
+        const FormCheck check = validate_form(form, sys);
+        if (!check.ok()) { // Start is disabled then; this is the way in that is left (a stale click, a key)
+            update_inputs();
+            HWND bad = check.megabytes.ok() ? hThr : hMB;
+            SetFocus(bad);
+            SendMessageW(bad, EM_SETSEL, 0, -1);
+            return;
+        }
+        const Settings s = settings_from_form(form, sys);
         // show what will really run; the fields are not user input now, so EN_CHANGE is ignored
         setting = true;
         SetWindowTextW(hMB, std::to_wstring(s.megabytes).c_str());
@@ -563,6 +593,8 @@ struct MainWindow::Impl {
         hRng = item(ID_RNG);
         hSet = item(ID_SET);
         hFpu = item(ID_FPU);
+        hMbHint = item(ID_MBHINT);
+        hThrHint = item(ID_THRHINT);
 
         SendMessageW(hBeep, BM_SETCHECK, BST_CHECKED, 0);
         SendMessageW(hStopErr, BM_SETCHECK, BST_CHECKED, 0);
@@ -582,12 +614,13 @@ struct MainWindow::Impl {
         const u64 freeMB = sys.availPhys >> 20;
         const u64 defMB = std::max<u64>(64, freeMB / 100 * 90);
         SendMessageW(hMBud, UDM_SETBUDDY, reinterpret_cast<WPARAM>(hMB), 0);
-        SendMessageW(hMBud, UDM_SETRANGE32, 64, static_cast<LPARAM>(std::max<u64>(totalMB, 64)));
+        SendMessageW(hMBud, UDM_SETRANGE32, static_cast<WPARAM>(kMinMegabytes),
+                     static_cast<LPARAM>(max_manual_megabytes(sys)));
         SendMessageW(hMBud, UDM_SETPOS32, 0, static_cast<LPARAM>(defMB));
         UDACCEL acc[3] = {{0, 16}, {1, 128}, {3, 1024}};
         SendMessageW(hMBud, UDM_SETACCEL, 3, reinterpret_cast<LPARAM>(acc));
         SendMessageW(hThrUd, UDM_SETBUDDY, reinterpret_cast<WPARAM>(hThr), 0);
-        SendMessageW(hThrUd, UDM_SETRANGE32, 1, 256);
+        SendMessageW(hThrUd, UDM_SETRANGE32, 1, sys.cpus);
         SendMessageW(hThrUd, UDM_SETPOS32, 0, sys.cpus);
 
         lockWhileRunning = {hMB, hMBud, hThr, hThrUd, hStopErr, hCache, hRng, hSet, hFpu};
@@ -658,15 +691,15 @@ struct MainWindow::Impl {
             }
             if (HIWORD(wp) == EN_CHANGE && !setting) {
                 if (LOWORD(wp) == ID_MB) {
-                    wchar_t b[32] = {};
-                    GetWindowTextW(hMB, b, 32);
-                    mbAuto = b[0] == 0;
+                    mbAuto = read_text(hMB).empty();
                     if (mbAuto)
                         apply_auto_mb();
                 } // typed a value = manual; cleared = automatic
                 else if (LOWORD(wp) == ID_THR && mbAuto)
                     apply_auto_mb(); // thread count changed: refill memory automatically
             }
+            if (HIWORD(wp) == EN_CHANGE && (LOWORD(wp) == ID_MB || LOWORD(wp) == ID_THR))
+                update_inputs(); // also for a change the program made: the lines under the fields follow the text
             if (LOWORD(wp) == ID_START && HIWORD(wp) == BN_CLICKED) {
                 if (run.busy())
                     apply_gate(gate.on_stop_click(plat::now()));

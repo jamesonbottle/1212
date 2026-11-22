@@ -56,6 +56,21 @@ inline constexpr const wchar_t* kCacheItems[] = {L"Default", L"Bypass (flush)", 
 inline constexpr const wchar_t* kRngItems[] = {L"Default", L"SplitMix64", L"Murmur3 mix", L"Xorshift64*"};
 inline constexpr const wchar_t* kSetItems[] = {L"Full", L"Quick"};
 
+// ---- messages under the number fields (gui_model.h puts the numbers in) ----
+// Each is a line under its field, so it names no field and stays short: the line is one row of the window.
+inline constexpr const wchar_t* kHintWholeNumber = L"Whole number, ";
+inline constexpr const wchar_t* kHintTo = L" to ";
+inline constexpr const wchar_t* kHintTooSmall = L"Too small: the least is ";
+inline constexpr const wchar_t* kHintTooLarge = L"Too large: the most is ";
+inline constexpr const wchar_t* kHintEnd = L".";
+inline constexpr const wchar_t* kHintManualMb = L" MB.";
+inline constexpr const wchar_t* kHintAutoPercent = L"Automatic: 90 % of free memory.";
+inline constexpr const wchar_t* kHintAutoFloor = L"Automatic: free memory minus 512 MB.";
+inline constexpr const wchar_t* kHintAutoCommit = L"Automatic: limited by the page file.";
+inline constexpr const wchar_t* kHintAutoMinimum = L"Automatic: the minimum, 64 MB.";
+inline constexpr const wchar_t* kHintAutoThreadsPre = L"Automatic: ";
+inline constexpr const wchar_t* kHintAutoThreadsPost = L" (one per usable CPU).";
+
 // ---- the Start button and the status line ----
 inline constexpr const wchar_t* kStart = L"&Start";
 inline constexpr const wchar_t* kStop = L"&Stop";
