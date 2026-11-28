@@ -3,13 +3,6 @@
 #include "gen.h"
 #include "inject.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
-#include <string>
-#include <vector>
 
 namespace ddr5 {
 
@@ -20,12 +13,7 @@ const std::set<std::string>& RwstormOpts::keys() {
 }
 RwstormOpts RwstormOpts::from(const Params& P, const Logger& log) {
     RwstormOpts o;
-    o.write = ospec(P, "order", "random", log);
-    o.verify = ospec(P, "verify_order", "seq", log);
-    o.strides = stride_list(P, o.write.k == Order::STRIDE || o.verify.k == Order::STRIDE);
-    o.width = (int)P.num("width", 32);
-    o.nt = P.flag("nt", false);
-    o.flush = P.flag("flush", true);
+    o.read(P, log, "random", "seq");
     o.passes = std::max<u64>(1, P.num("passes", 4));
     return o;
 }

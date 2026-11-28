@@ -1,17 +1,11 @@
 // algo_march.cpp - user-defined march tests.
+#include <algorithm>
+#include <cctype>
 #include <cstring>
 #include "algo.h"
 #include "gen.h"
 #include "inject.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
-#include <cctype>
-#include <string>
-#include <vector>
 
 namespace ddr5 {
 
@@ -125,11 +119,8 @@ MarchOpts MarchOpts::from(const Params& P, const Logger& log) {
     }
     if (o.orders.empty())
         o.orders.push_back({"seq", OrderSpec()});
-    bool anyStride = false;
-    for (auto& on : o.orders)
-        if (on.second.k == Order::STRIDE)
-            anyStride = true;
-    o.strides = stride_list(P, anyStride);
+    o.strides = stride_list(P, std::any_of(o.orders.begin(), o.orders.end(),
+                                           [](const auto& on) { return on.second.k == Order::STRIDE; }));
     o.bursts = P.nums("burst", "1");
     if (o.bursts.empty())
         o.bursts.push_back(1);
@@ -138,8 +129,7 @@ MarchOpts MarchOpts::from(const Params& P, const Logger& log) {
     o.flush = P.flag("flush", true);
     for (auto& m : o.variants)
         for (auto& e : m.els)
-            if (e.dist)
-                o.anyDist = true;
+            o.anyDist = o.anyDist || e.dist;
     return o;
 }
 
@@ -164,11 +154,7 @@ void algo_march(Run& R, const Params& P) {
     for (auto& v : vars)
         for (size_t mi = 0; mi < opt.variants.size(); mi++)
             for (auto& on : opt.orders) {
-                std::vector<u64> sl;
-                if (on.second.k == Order::STRIDE)
-                    sl = opt.strides;
-                else
-                    sl.push_back(1);
+                const std::vector<u64> sl = on.second.k == Order::STRIDE ? opt.strides : std::vector<u64>{1};
                 for (u64 s : sl)
                     for (u64 b : opt.bursts)
                         jobs.push_back(

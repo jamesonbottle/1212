@@ -3,15 +3,9 @@
 #include "gen.h"
 #include "inject.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
 #include <atomic>
 #include <cstdlib>
 #include <memory>
-#include <vector>
 
 namespace ddr5 {
 
@@ -30,8 +24,8 @@ static void pm_fill(u8* p, const Gen& g, bool inv) {
     }
 }
 template <int FL>
-static void pm_check(Run& R, int tid, u8* p, const Gen& g, bool inv, const char* ph) {
-    using io = IO<32, 0, FL>;
+static void pm_check(Run& R, int tid, u8* p, const Gen& g, bool inv, const char* ph, u8* d = nullptr) {
+    using io = IO<32, 0, FL>; // verify page p, repairing bad lines; with d, also copy the expected data to page d
     for (u64 l = 0; l < kLinesPerPage; l++) {
         Line e, a;
         g.make(l, p + l * kLineBytes, inv, e);
@@ -40,23 +34,10 @@ static void pm_check(Run& R, int tid, u8* p, const Gen& g, bool inv, const char*
             R.report(tid, p + l * kLineBytes, e, a, ph);
             io::store(p + l * kLineBytes, e);
         }
+        if (d)
+            io::store(d + l * kLineBytes, e);
     }
     R.mark_verified(p, kLinesPerPage);
-}
-template <int FL>
-static void pm_copy(Run& R, int tid, u8* s, u8* d, const Gen& g, bool inv) {
-    using io = IO<32, 0, FL>;
-    for (u64 l = 0; l < kLinesPerPage; l++) {
-        Line e, a;
-        g.make(l, s + l * kLineBytes, inv, e);
-        R.vtick();
-        if (!io::verify(s + l * kLineBytes, e, a)) {
-            R.report(tid, s + l * kLineBytes, e, a, "pagemix-src");
-            io::store(s + l * kLineBytes, e);
-        }
-        io::store(d + l * kLineBytes, e);
-    }
-    R.mark_verified(s, kLinesPerPage);
 }
 template <int FL>
 static void pm_invert(u8* p) {
@@ -173,7 +154,9 @@ void algo_pagemix(Run& R, const Params& P) {
             PagePat sq = pp[s]; // sq / sg: the source page's pattern and its generator
             Gen sg = gen(sq);
             if (op <= 5) {
-                with_flush(fl, [&](auto FLc) { pm_copy<decltype(FLc)::value>(R, tid, sa, da, sg, sq.inv); });
+                with_flush(fl, [&](auto FLc) {
+                    pm_check<decltype(FLc)::value>(R, tid, sa, sg, sq.inv, "pagemix-src", da);
+                });
                 pp[d] = sq;
                 R.add_done(8192);
             } else if (op == 6) {

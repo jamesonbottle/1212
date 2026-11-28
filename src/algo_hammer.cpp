@@ -2,13 +2,6 @@
 #include "algo.h"
 #include "gen.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
-#include <string>
-#include <vector>
 
 namespace ddr5 {
 

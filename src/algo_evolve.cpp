@@ -3,13 +3,6 @@
 #include "gen.h"
 #include "inject.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
-#include <string>
-#include <vector>
 
 namespace ddr5 {
 
@@ -21,12 +14,7 @@ const std::set<std::string>& EvolveOpts::keys() {
 }
 EvolveOpts EvolveOpts::from(const Params& P, const Logger& log) {
     EvolveOpts o;
-    o.write = ospec(P, "order", "random", log);
-    o.verify = ospec(P, "verify_order", "seq", log);
-    o.strides = stride_list(P, o.write.k == Order::STRIDE || o.verify.k == Order::STRIDE);
-    o.width = (int)P.num("width", 32);
-    o.nt = P.flag("nt", false);
-    o.flush = P.flag("flush", true);
+    o.read(P, log, "random", "seq");
     o.cross = P.flag("cross", false);
     o.passes = std::max<u64>(1, P.num("passes", 16));
     o.period = std::max<u64>(1, P.num("period", 8));

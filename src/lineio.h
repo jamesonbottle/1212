@@ -88,17 +88,7 @@ inline void with_flush(bool fl, F&& f) {
 template <class F>
 inline void dispatch(int width, bool nt, bool fl, F&& f) {
     auto d3 = [&](auto w) {
-        if (nt) {
-            if (fl)
-                f(w, IC<1>{}, IC<1>{});
-            else
-                f(w, IC<1>{}, IC<0>{});
-        } else {
-            if (fl)
-                f(w, IC<0>{}, IC<1>{});
-            else
-                f(w, IC<0>{}, IC<0>{});
-        }
+        with_flush(nt, [&](auto n) { with_flush(fl, [&](auto l) { f(w, n, l); }); });
     };
     if (width == 8)
         d3(IC<8>{});

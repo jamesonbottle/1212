@@ -3,15 +3,9 @@
 #include "gen.h"
 #include "inject.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
 #include <algorithm>
 #include <atomic>
 #include <cstring>
-#include <string>
 
 namespace ddr5 {
 

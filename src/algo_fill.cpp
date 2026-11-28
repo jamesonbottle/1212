@@ -3,13 +3,6 @@
 #include "gen.h"
 #include "inject.h"
 #include "lineio.h"
-#include "log.h"
-#include "order.h"
-#include "platform.h"
-#include "run.h"
-#include "seed.h"
-#include <string>
-#include <vector>
 
 namespace ddr5 {
 
@@ -21,15 +14,9 @@ const std::set<std::string>& FillOpts::keys() {
 }
 FillOpts FillOpts::from(const Params& P, const Logger& log) {
     FillOpts o;
-    o.write = ospec(P, "order", "seq", log);
-    o.verify = ospec(P, "verify_order", P.str("order", "seq").c_str(), log);
-    o.strided = o.write.k == Order::STRIDE || o.verify.k == Order::STRIDE;
-    o.strides = stride_list(P, o.strided);
+    o.read(P, log, "seq");
     o.both = P.flag("both", false);
     o.cross = P.flag("cross", false);
-    o.width = (int)P.num("width", 32);
-    o.nt = P.flag("nt", false);
-    o.flush = P.flag("flush", true);
     o.reads = std::max<u64>(1, P.num("reads", 1));
     o.dwell_ms = P.nums("dwell_ms", "0");
     if (o.dwell_ms.empty())

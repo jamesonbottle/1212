@@ -1,6 +1,7 @@
 // algo.cpp - shared algo helpers and the algo registry (algos()).
 #include "algo.h"
 #include <atomic>
+#include <functional>
 #include "gen.h"
 #include "lineio.h"
 
@@ -23,6 +24,17 @@ std::vector<u64> stride_list(const Params& P, bool needed) {
         o.push_back(std::max<u64>(1, b / kLineBytes));
     }
     return o;
+}
+
+void IoOpts::read(const Params& P, const Logger& log, const char* wdef, const char* vdef) {
+    const std::string vd = vdef ? vdef : P.str("order", wdef);
+    write = ospec(P, "order", wdef, log);
+    verify = ospec(P, "verify_order", vd.c_str(), log);
+    strided = write.k == Order::STRIDE || verify.k == Order::STRIDE;
+    strides = stride_list(P, strided);
+    width = (int)P.num("width", 32);
+    nt = P.flag("nt", false);
+    flush = P.flag("flush", true);
 }
 
 // disturb traffic (manufacturer-style "disturb between write and read")
@@ -132,26 +144,18 @@ std::vector<std::string> bad_values(const TestDef& t) {
     cap.sink = [&](const std::string& s) {
         out.push_back(trim(s));
     };
-    if (algo == "fill")
-        FillOpts::from(P, cap);
-    else if (algo == "march")
-        MarchOpts::from(P, cap);
-    else if (algo == "evolve")
-        EvolveOpts::from(P, cap);
-    else if (algo == "rwstorm")
-        RwstormOpts::from(P, cap);
-    else if (algo == "hammer")
-        HammerOpts::from(P);
-    else if (algo == "copy")
-        CopyOpts::from(P);
-    else if (algo == "chase")
-        ChaseOpts::from(P);
-    else if (algo == "probe")
-        ProbeOpts::from(P);
-    else if (algo == "pagemix")
-        PagemixOpts::from(P);
-    else if (algo == "coherency")
-        CoherencyOpts::from(P);
+    static const std::map<std::string, std::function<void(const Params&, const Logger&)>> parse = {
+        {"fill", [](const Params& p, const Logger& l) { FillOpts::from(p, l); }},
+        {"march", [](const Params& p, const Logger& l) { MarchOpts::from(p, l); }},
+        {"evolve", [](const Params& p, const Logger& l) { EvolveOpts::from(p, l); }},
+        {"rwstorm", [](const Params& p, const Logger& l) { RwstormOpts::from(p, l); }},
+        {"hammer", [](const Params& p, const Logger&) { HammerOpts::from(p); }},
+        {"copy", [](const Params& p, const Logger&) { CopyOpts::from(p); }},
+        {"chase", [](const Params& p, const Logger&) { ChaseOpts::from(p); }},
+        {"probe", [](const Params& p, const Logger&) { ProbeOpts::from(p); }},
+        {"pagemix", [](const Params& p, const Logger&) { PagemixOpts::from(p); }},
+        {"coherency", [](const Params& p, const Logger&) { CoherencyOpts::from(p); }}};
+    parse.at(algo)(P, cap);
     const Keys& mine = algo_keys(algo);
     if (mine.count("data"))
         build_vars(P, 0, Rng::Default, cap);

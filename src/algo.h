@@ -118,15 +118,20 @@ struct EvoPass {
 };
 
 // typed test options One struct per algo, parsed ONCE before R.parallel: the algo body reads fields
-struct FillOpts {
-    OrderSpec write, verify;   // order, verify_order (defaults to order)
-    bool strided = false;      // either order is a stride order
-    std::vector<u64> strides;  // stride, in lines; {1} when not strided
+// What fill, rwstorm and evolve share: write/verify order, strides, bus width, non-temporal stores, flush.
+struct IoOpts {
+    OrderSpec write, verify;  // order, verify_order (vdef = null: defaults to order)
+    bool strided = false;     // either order is a stride order
+    std::vector<u64> strides; // stride, in lines; {1} when not strided
+    int width = 32;           // bus width of the accesses in bits
+    bool nt = false;          // non-temporal stores
+    bool flush = true;        // clflush after access
+    void read(const Params& P, const Logger& log, const char* wdef, const char* vdef = nullptr);
+};
+
+struct FillOpts : IoOpts {
     bool both = false;         // run every data variant normal and inverted
     bool cross = false;        // verify the window of the next thread
-    int width = 32;            // bus width of the accesses in bits
-    bool nt = false;           // non-temporal stores
-    bool flush = true;         // clflush after access
     u64 reads = 1;             // verify passes per job (>= 1)
     std::vector<u64> dwell_ms; // idle time between write and verify; never empty
     std::vector<int> disturb;  // disturb modes (parse_dmode); {-1} = none
@@ -171,23 +176,13 @@ struct ChaseOpts {
     static ChaseOpts from(const Params& P);
 };
 
-struct RwstormOpts {
-    OrderSpec write{Order::RANDOM, false}; // order (the writer's order)
-    OrderSpec verify;                      // verify_order (the reader's order, default seq)
-    std::vector<u64> strides;              // stride, in lines; {1} unless an order is a stride order
-    int width = 32;
-    bool nt = false, flush = true;
-    u64 passes = 4; // passes of rewrite / concurrent verify (>= 1)
+struct RwstormOpts : IoOpts { // order = the writer's (random), verify_order = the reader's (seq)
+    u64 passes = 4;           // passes of rewrite / concurrent verify (>= 1)
     static const std::set<std::string>& keys();
     static RwstormOpts from(const Params& P, const Logger& log);
 };
 
-struct EvolveOpts {
-    OrderSpec write{Order::RANDOM, false}; // order (generation writes)
-    OrderSpec verify;                      // verify_order (default seq)
-    std::vector<u64> strides;              // stride, in lines; {1} unless an order is a stride order
-    int width = 32;
-    bool nt = false, flush = true;
+struct EvolveOpts : IoOpts { // order = generation writes (random), verify_order = default seq
     bool cross = false; // verify the window of the next thread
     u64 passes = 16;    // passes (>= 1)
     u64 period = 8;     // longest update period of a line, in passes (>= 1)

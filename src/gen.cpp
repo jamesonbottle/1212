@@ -83,10 +83,13 @@ static u16 rotl16(u16 v, int r) {
 static void expand_style(const std::string& st, const Params& P, std::vector<std::pair<std::string, Beats>>& out,
                          const Logger& log) {
     u16 s[32];
-    auto uni = [&](const std::string& n, u16 e, u16 o) {
+    auto per = [&](const std::string& n, auto lane) { // one variant: lane(L) = the 16 beats of DQ lane L
         for (int L = 0; L < 32; L++)
-            s[L] = (L & 1) ? o : e;
+            s[L] = (u16)lane(L);
         out.push_back({n, beats_from_lanes(s)});
+    };
+    auto uni = [&](const std::string& n, u16 e, u16 o) {
+        per(n, [&](int L) { return (L & 1) ? o : e; });
     };
     if (st == "sso")
         uni("sso(all lanes toggle in phase)", 0x5555, 0x5555);
@@ -99,27 +102,14 @@ static void expand_style(const std::string& st, const Params& P, std::vector<std
     else if (st == "low")
         uni("lowfreq(8 ones/8 zeros)", 0x00FF, 0xFF00);
     else if (st == "pulse") {
-        for (int L = 0; L < 32; L++) {
-            s[L] = (u16)(1u << (L % 16));
-        }
-        out.push_back({"pulse(single 1 in zeros)", beats_from_lanes(s)});
-        for (int L = 0; L < 32; L++) {
-            s[L] = (u16) ~(1u << (L % 16));
-        }
-        out.push_back({"pulse_inv(single 0 in ones)", beats_from_lanes(s)});
+        per("pulse(single 1 in zeros)", [](int L) { return 1u << (L % 16); });
+        per("pulse_inv(single 0 in ones)", [](int L) { return ~(1u << (L % 16)); });
     } else if (st == "skew") {
-        for (int L = 0; L < 32; L++) {
-            s[L] = rotl16(0x0F0F, L);
-        }
-        out.push_back({"skew(quarter, phase=lane)", beats_from_lanes(s)});
-        for (int L = 0; L < 32; L++) {
-            s[L] = rotl16(0x00FF, L);
-        }
-        out.push_back({"skew(low, phase=lane)", beats_from_lanes(s)});
+        per("skew(quarter, phase=lane)", [](int L) { return rotl16(0x0F0F, L); });
+        per("skew(low, phase=lane)", [](int L) { return rotl16(0x00FF, L); });
     } else if (st == "victim") {
-        auto vl = P.nums("victims");
-        std::vector<u64> victims = vl;
-        for (u64 v : vl)
+        std::vector<u64> victims = P.nums("victims");
+        for (u64 v : victims)
             if (v >= 32)
                 P.note_bad("key 'victims': lane " + std::to_string(v) + " does not exist (lanes are 0..31)");
         if (victims.empty())
@@ -132,11 +122,8 @@ static void expand_style(const std::string& st, const Params& P, std::vector<std
                      {"toggle/aggr=opposite", 0x5555, 0xAAAA}, {"toggle/aggr=inphase", 0x5555, 0x5555},
                      {"static0/aggr=toggle", 0x0000, 0x5555},  {"static1/aggr=toggle", 0xFFFF, 0x5555}};
         for (u64 v : victims)
-            for (auto& md : modes) {
-                for (int L = 0; L < 32; L++)
-                    s[L] = (L == (int)v) ? md.v : md.a;
-                out.push_back({"victim lane " + std::to_string(v) + " " + md.n, beats_from_lanes(s)});
-            }
+            for (auto& md : modes)
+                per("victim lane " + std::to_string(v) + " " + md.n, [&](int L) { return L == (int)v ? md.v : md.a; });
     } else if (st == "walk1" || st == "walk0") {
         for (size_t k = 0; k < 32; k++) {
             Beats b;
